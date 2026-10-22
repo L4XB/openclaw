@@ -26,6 +26,7 @@ import {
   shouldQueueLocalSlashCommand,
 } from "./chat-commands.ts";
 import { captureChatConnectionOwner } from "./chat-connection-owner.ts";
+import { chatGoalCreationObjective, replaceExistingChatGoal } from "./chat-goals.ts";
 import { isInitialChatHistoryUnavailable, setChatError } from "./chat-history-state.ts";
 import { loadChatHistory } from "./chat-history.ts";
 import { chatOutboxOwner } from "./chat-outbox-owner.ts";
@@ -131,6 +132,7 @@ export async function handleSendChat(
   const userMessage = intent ? rawMessage : submitted.text;
   const submittedAtMs = performance.now();
   const submittedSessionKey = host.sessionKey;
+  const submittedSessionId = host.currentSessionId;
   const submittedConnectionIsCurrent = captureChatConnectionOwner(host, false);
   const submittedOwnerIsCurrent = captureOutboxPayloadOwner(host);
   let expectedLeafEntryId = resolveDisplayedLeafEntryId(host);
@@ -206,6 +208,29 @@ export async function handleSendChat(
       "Queued-row edits cannot run commands or stop aliases. Cancel this edit and send the command from the composer.",
     );
     return undefined;
+  }
+
+  const goalObjective =
+    intent?.kind === "session-goal-start"
+      ? userMessage
+      : !intent
+        ? chatGoalCreationObjective(userMessage)
+        : undefined;
+  if (goalObjective) {
+    const replaced = await replaceExistingChatGoal(host, goalObjective);
+    if (replaced !== undefined) {
+      if (
+        replaced &&
+        submitGuardOptions.isCurrent() &&
+        host.currentSessionId === submittedSessionId
+      ) {
+        if (messageOverride == null) {
+          clearComposer("all");
+          recordNonTranscriptInputHistory(host, userMessage);
+        }
+      }
+      return replaced;
+    }
   }
 
   // Commands own the raw composer text. Annotation context is model input and must not

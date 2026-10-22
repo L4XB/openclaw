@@ -5,6 +5,10 @@ import type {
   SessionsGoalMutationResult,
   SessionsGoalUpdateParams,
 } from "../../../../packages/gateway-protocol/src/schema/sessions-goal.js";
+import {
+  matchSlashCommandToken,
+  splitCommandAction,
+} from "../../../../src/auto-reply/reply/commands-slash-parse.js";
 import { createChangeListeners } from "../../../../src/shared/listeners.js";
 import { GatewayRequestError } from "../../api/gateway.ts";
 import type { SessionGoal } from "../../api/types.ts";
@@ -33,9 +37,11 @@ import {
   resolveUiConversationIdentity,
 } from "../../lib/sessions/session-key.ts";
 import { generateUUID } from "../../lib/uuid.ts";
+import { captureChatConnectionOwner } from "./chat-connection-owner.ts";
 import { isInitialChatHistoryUnavailable, setChatError } from "./chat-history-state.ts";
 import type { ChatHost, ChatSendSubmitOptions } from "./chat-send-contract.ts";
-import { adoptStartedChatRun } from "./run-lifecycle.ts";
+import { chatSendHoldReason } from "./chat-send-support.ts";
+import { adoptStartedChatRun, hasDirectSessionRun, isChatBusy } from "./run-lifecycle.ts";
 
 registerChatSessionEnglish();
 
@@ -251,6 +257,119 @@ export function chatGoalRecovery(host: ChatHost): ChatGoalRecovery | undefined {
     };
   } catch {
     return undefined;
+  }
+}
+
+/** Only creation syntax is intercepted; explicit management commands keep their normal path. */
+export function chatGoalCreationObjective(message: string): string | undefined {
+  const args = matchSlashCommandToken(message, "/goal");
+  if (!args) {
+    return undefined;
+  }
+  const parsed = splitCommandAction(args);
+  if (["start", "set", "create"].includes(parsed.action)) {
+    return parsed.args || undefined;
+  }
+  if (
+    ["status", "edit", "pause", "resume", "complete", "done", "block", "blocked", "clear"].includes(
+      parsed.action,
+    )
+  ) {
+    return undefined;
+  }
+  return args;
+}
+
+/** Undefined means first creation: leave it with the ordinary send/admission owner. */
+export async function replaceExistingChatGoal(
+  host: ChatHost,
+  objective: string,
+): Promise<boolean | undefined> {
+  const currentGoal = () =>
+    host.sessionsResult?.sessions.find(
+      (row) =>
+        row.sessionId === host.currentSessionId &&
+        visibleSessionMatches(
+          host,
+          row.key,
+          row.agentId ?? host.sessionsResultAgentId ?? undefined,
+        ),
+    )?.goal;
+  const goal = currentGoal();
+  if (!goal) {
+    return undefined;
+  }
+  const sessionKey = host.sessionKey;
+  const sessionId = host.currentSessionId;
+  const agentId = scopedAgentIdForSession(host, sessionKey);
+  const connectionIsCurrent = captureChatConnectionOwner(host, false);
+  const scopeIsCurrent = () =>
+    connectionIsCurrent() &&
+    host.currentSessionId === sessionId &&
+    visibleSessionMatches(host, sessionKey, agentId);
+  // Capture values, not a renderer-owned row that may be replaced while the modal is open.
+  const { id: goalId, objective: previousObjective, status, updatedAt } = goal;
+  const unavailable = () => {
+    if (!host.connected || !host.client) {
+      return t("chat.goals.offline");
+    }
+    if (!sessionId || isInitialChatHistoryUnavailable(host)) {
+      return t("chat.thread.loading");
+    }
+    const hold = chatSendHoldReason(host, sessionKey, false, agentId);
+    if (hold) {
+      return hold;
+    }
+    const recovery = chatGoalRecovery(host);
+    if (recovery) {
+      return t(recovery.pending ? "chat.goals.actionPending" : "chat.goals.outcomeUnknown");
+    }
+    if (currentGoal()?.status === "complete") {
+      return t("chat.goals.editUnavailable");
+    }
+    if (isChatBusy(host) || hasDirectSessionRun(host)) {
+      return t("chat.goals.busy");
+    }
+    return null;
+  };
+  const initialError = unavailable();
+  if (initialError) {
+    return rejectGoalOperation(host, initialError);
+  }
+  try {
+    const { showConfirmDialog } = await import("../../components/confirm-dialog.ts");
+    if (!scopeIsCurrent()) {
+      return false;
+    }
+    const confirmed = await showConfirmDialog({
+      title: t("chat.goals.replaceTitle"),
+      message: t("chat.goals.replaceMessage"),
+      details: objective,
+      confirmLabel: t("chat.goals.replace"),
+    });
+    if (!confirmed || !scopeIsCurrent()) {
+      return false;
+    }
+    const latest = currentGoal();
+    if (
+      latest?.id !== goalId ||
+      latest.objective !== previousObjective ||
+      latest.status !== status ||
+      latest.updatedAt !== updatedAt
+    ) {
+      return rejectGoalOperation(host, t("chat.goals.goalChanged"));
+    }
+    const error = unavailable();
+    if (error) {
+      return rejectGoalOperation(host, error);
+    }
+    // Reuse Edit's durable operation and status guards; replacement never clears or resumes.
+    return await mutateChatGoal(host, { action: "edit", goalId, objective });
+  } catch (error) {
+    if (scopeIsCurrent()) {
+      setChatError(host, formatUiError(error));
+    }
+    return false;
   }
 }
 

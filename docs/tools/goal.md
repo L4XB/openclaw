@@ -91,8 +91,15 @@ Commands: /goal edit <objective>, /goal pause, /goal complete, /goal clear
 | `/goal blocked [note]`                              | Alias for `block`.                                                       |
 | `/goal clear`                                       | Remove the goal from the session.                                        |
 
-Only one goal can exist on a session at a time. Starting a second goal fails
-with `Goal error: goal already exists` until the current one is cleared.
+Only one goal can exist on a session at a time. In the Control UI, submitting
+a new objective through `/goal <objective>` or the Goal composer asks whether
+to replace the current objective. Confirming uses **Edit**: the goal keeps its
+identity, status, token accounting, budget, and elapsed time, and does not resume.
+Canceling keeps the proposed objective in the composer. Completed goals cannot
+be edited; use the existing explicit controls instead.
+
+In textual CLI/TUI commands, starting a second goal still fails with
+`Goal error: goal already exists` until the current one is cleared.
 
 `/goal start` does not take a token-budget flag. Only the model-facing `create_goal` tool can set a budget.
 
