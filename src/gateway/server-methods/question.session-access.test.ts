@@ -9,6 +9,10 @@ import {
   readSessionQuestionCustody,
 } from "../../config/sessions/session-questions.js";
 import type { DurableQuestion } from "../../config/sessions/session-questions.types.js";
+import {
+  addSessionMember,
+  removeSessionMember,
+} from "../../config/sessions/session-sharing-store.js";
 import { projectionLane } from "../../config/sessions/session-transcript-worker-resources.js";
 import { releaseAgentRunDelegatedAuthority } from "../../infra/agent-run-registry.js";
 import { sessionChanges } from "../../sessions/session-row-changes.js";
@@ -810,95 +814,135 @@ it("publishes server-owned terminal receipts to current own-session recipients a
   });
 });
 
-it("reads and settles canonical restored custody in its original store after the configured route changes", async () => {
-  vi.useRealTimers();
-  await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
-    const f = await fixture(state);
-    expect((await f.request("original-store-question"))[0]).toBe(true);
-    const original = manager.observe("original-store-question")!;
-    const binding = original.sessionAccess?.durableBinding;
-    if (!binding) {
-      throw new Error("Expected native captured conversation binding");
-    }
-    const record = structuredClone(original.record);
-    const question: DurableQuestion = {
-      record,
-      sessionKey: binding.sessionKey,
-      sessionId: binding.sessionId,
-      lifecycleRevision: binding.lifecycleRevision,
-      sessionBinding: binding,
-      provenance: { issuer: "operator", sourceRunId: requestParams.runId },
-      continuation: { status: "pending" },
-    };
-    const canonical = await executeSessionQuestionOperation(
-      {
-        agentId: binding.agentId,
+it.each(["original member", "configured-only member", "revoked original member"] as const)(
+  "reads and settles restored original-store custody after routing changes (%s)",
+  async (membership) => {
+    vi.useRealTimers();
+    await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
+      const f = await fixture(state);
+      expect((await f.request("original-store-question"))[0]).toBe(true);
+      const original = manager.observe("original-store-question")!;
+      const binding = original.sessionAccess?.durableBinding;
+      if (!binding) {
+        throw new Error("Expected native captured conversation binding");
+      }
+      const record = structuredClone(original.record);
+      const question: DurableQuestion = {
+        record,
         sessionKey: binding.sessionKey,
-        storePath: binding.storePath,
-        assertCurrent() {},
-      },
-      { kind: "register", question },
-    );
-    if (!canonical || Array.isArray(canonical)) {
-      throw new Error("Expected canonical native question registration");
-    }
-    manager.reset();
-    const continuationOwed = vi.fn();
-    installDurableQuestion(manager, canonical, continuationOwed);
-    const replacement = state.statePath("replacement", "catalog.sqlite");
-    await upsertSessionEntryCore(
-      { agentId: "main", storePath: replacement, sessionKey: requestParams.sessionKey },
-      { ...f.entry, sessionId: "different-configured-session" },
-    );
-    f.cfg.session = { ...f.cfg.session, store: replacement };
-    await state.writeConfig(f.cfg);
-    setRuntimeConfigSnapshot(f.cfg);
-    expect(await f.call("question.get", { id: record.id })).toEqual([
-      true,
-      { question: record },
-      undefined,
-    ]);
-    expect(await f.call("question.list", {})).toEqual([true, { questions: [record] }, undefined]);
-    const answers = { answers: { destination: ["Home"] } };
-    expect(await f.call("question.resolve", { id: record.id, answers })).toEqual([
-      true,
-      { status: "answered", answers },
-      undefined,
-    ]);
-    expect(continuationOwed).toHaveBeenCalledOnce();
-    expect(await readSessionQuestionCustody(binding, record.id, () => {})).toMatchObject({
-      record: { status: "answered", answers },
-      continuation: { status: "owed" },
-    });
-    expect(
-      await executeSessionQuestionOperation(
+        sessionId: binding.sessionId,
+        lifecycleRevision: binding.lifecycleRevision,
+        sessionBinding: binding,
+        provenance: { issuer: "operator", sourceRunId: requestParams.runId },
+        continuation: { status: "pending" },
+      };
+      const canonical = await executeSessionQuestionOperation(
         {
-          agentId: "main",
+          agentId: binding.agentId,
           sessionKey: binding.sessionKey,
-          storePath: replacement,
+          storePath: binding.storePath,
           assertCurrent() {},
         },
-        { kind: "get", id: record.id },
-      ),
-    ).toBeUndefined();
-    expect(
-      await f.call("question.resolve", {
-        id: record.id,
-        answers: { answers: { destination: ["Office"] } },
-      }),
-    ).toEqual([true, { status: "answered", answers }, undefined]);
-    // A healthy old physical source stays usable; its generation still revokes access.
-    await upsertSessionEntryCore(
-      { agentId: "main", storePath: binding.storePath, sessionKey: binding.sessionKey },
-      { ...f.entry, lifecycleRevision: "original-store-successor" },
-    );
-    expect(await f.call("question.get", { id: record.id })).toMatchObject([
-      false,
-      undefined,
-      { details: { reason: "QUESTION_NOT_FOUND" } },
-    ]);
-  });
-});
+        { kind: "register", question },
+      );
+      if (!canonical || Array.isArray(canonical)) {
+        throw new Error("Expected canonical native question registration");
+      }
+      manager.reset();
+      const continuationOwed = vi.fn();
+      installDurableQuestion(manager, canonical, continuationOwed);
+      const replacement = state.statePath("replacement", "catalog.sqlite");
+      await upsertSessionEntryCore(
+        { agentId: "main", storePath: replacement, sessionKey: requestParams.sessionKey },
+        { ...f.entry, sessionId: "different-configured-session" },
+      );
+      const memberId = f.viewer.authenticatedUserProfile!.profileId;
+      const originalScope = {
+        agentId: binding.agentId,
+        storePath: binding.storePath,
+        sessionKey: binding.sessionKey,
+      };
+      await addSessionMember(
+        { ...originalScope, storePath: replacement },
+        { identityId: memberId, addedBy: "owner" },
+      );
+      if (membership !== "configured-only member") {
+        await addSessionMember(originalScope, { identityId: memberId, addedBy: "owner" });
+      }
+      const caller = {
+        ...f.viewer,
+        connect: { ...f.viewer.connect, scopes: ["operator.questions"] },
+      };
+      f.cfg.gateway!.roles!.definitions.write!.agents = "*";
+      f.cfg.session = { ...f.cfg.session, store: replacement };
+      await state.writeConfig(f.cfg);
+      setRuntimeConfigSnapshot(f.cfg);
+      expect(await f.call("question.get", { id: record.id }, caller)).toEqual([
+        true,
+        { question: record },
+        undefined,
+      ]);
+      expect(await f.call("question.list", {}, caller)).toEqual([
+        true,
+        { questions: [record] },
+        undefined,
+      ]);
+      if (membership === "revoked original member") {
+        await removeSessionMember(originalScope, memberId);
+      }
+      const answers = { answers: { destination: ["Home"] } };
+      const resolution = await f.call("question.resolve", { id: record.id, answers }, caller);
+      if (membership !== "original member") {
+        expect(resolution).toMatchObject([
+          false,
+          undefined,
+          { details: { reason: "QUESTION_NOT_FOUND" } },
+        ]);
+        expect(continuationOwed).not.toHaveBeenCalled();
+        expect(await readSessionQuestionCustody(binding, record.id, () => {})).toMatchObject({
+          record: { status: "pending" },
+          continuation: { status: "pending" },
+        });
+      } else {
+        expect(resolution).toEqual([true, { status: "answered", answers }, undefined]);
+        expect(continuationOwed).toHaveBeenCalledOnce();
+        expect(await readSessionQuestionCustody(binding, record.id, () => {})).toMatchObject({
+          record: { status: "answered", answers },
+          continuation: { status: "owed" },
+        });
+      }
+      expect(
+        await executeSessionQuestionOperation(
+          {
+            agentId: "main",
+            sessionKey: binding.sessionKey,
+            storePath: replacement,
+            assertCurrent() {},
+          },
+          { kind: "get", id: record.id },
+        ),
+      ).toBeUndefined();
+      if (membership === "original member") {
+        expect(
+          await f.call("question.resolve", {
+            id: record.id,
+            answers: { answers: { destination: ["Office"] } },
+          }),
+        ).toEqual([true, { status: "answered", answers }, undefined]);
+      }
+      // A healthy old physical source stays usable; its generation still revokes access.
+      await upsertSessionEntryCore(
+        { agentId: "main", storePath: binding.storePath, sessionKey: binding.sessionKey },
+        { ...f.entry, lifecycleRevision: "original-store-successor" },
+      );
+      expect(await f.call("question.get", { id: record.id })).toMatchObject([
+        false,
+        undefined,
+        { details: { reason: "QUESTION_NOT_FOUND" } },
+      ]);
+    });
+  },
+);
 
 it("keeps durable broad terminal publication bound to the original conversation after producer retirement", async () => {
   await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
