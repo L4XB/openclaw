@@ -272,7 +272,6 @@ export type SessionActorReceipt = {
   conversationPublication?: readonly ConversationPublication[];
   pendingInputReceipt?: SessionPendingInputWorkerReceipt;
   pendingInputMutationReceipt?: PendingInputMutationReceipt;
-  pendingFinalDelivery?: SessionEntry["pendingFinalDelivery"];
   reducers: SessionActorReducerOutcome[];
   /** Complete detached postimage, installed on MAIN before acknowledgement. */
   postimage: SessionActorHotState;
@@ -307,7 +306,7 @@ export type SessionActorOutcome<Value> =
       kind: "unknown";
       target: SessionActorTarget;
       commandId: string;
-      error: { name: string; message: string };
+      error: { name: string; message: string; cause?: unknown };
     };
 
 export type SessionActorCommitObserver<Value> = {

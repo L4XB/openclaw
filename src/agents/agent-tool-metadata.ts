@@ -17,6 +17,7 @@ import {
 } from "./runtime/internal-hooks.js";
 import { resolveCoreToolExecutionLocation } from "./tool-catalog.js";
 import { copyToolInvocationMetadata } from "./tool-invocation-metadata.js";
+import { copyAgentToolReplaySafety } from "./tool-replay-safety.js";
 import { copyToolTerminalPresentation } from "./tool-terminal-presentation.js";
 
 export type AgentToolActionDescriptor = Readonly<{
@@ -37,6 +38,7 @@ export type AgentToolExecutionLocation =
 type ToolActionState = Readonly<{
   descriptor?: AgentToolActionDescriptor;
   executionLocation?: AgentToolExecutionLocation;
+  gatewayPolicyControl?: true;
 }>;
 
 // Rebuilt tools retain prepared classification without adding weak-table edges.
@@ -48,7 +50,7 @@ class ToolActionMetadata extends PluginHostObject {
     this.#state = state;
   }
 
-  static get(tool: AnyAgentTool): ToolActionState | undefined {
+  static get(tool: object): ToolActionState | undefined {
     return #state in tool ? tool.#state : undefined;
   }
 
@@ -59,6 +61,16 @@ class ToolActionMetadata extends PluginHostObject {
       void new ToolActionMetadata(tool, state);
     }
   }
+}
+
+/** Only host-owned catalog dispatchers bypass the target-tool allowlist. */
+export function bindGatewayToolPolicyControl<T extends AnyAgentTool>(tool: T): T {
+  ToolActionMetadata.set(tool, { gatewayPolicyControl: true });
+  return tool;
+}
+
+export function isGatewayToolPolicyControl(tool: object): boolean {
+  return ToolActionMetadata.get(tool)?.gatewayPolicyControl === true;
 }
 
 const memoryAction: AgentToolActionDescriptor = Object.freeze({
@@ -114,6 +126,7 @@ export function copyBeforeToolCallWrapperMetadata(
     ToolActionMetadata.set(target, state);
   }
   copyAgentToolAvailability(source, target);
+  copyAgentToolReplaySafety(source, target);
 }
 
 /** Bind the broad family at final assembly from private, process-stable owner metadata. */
