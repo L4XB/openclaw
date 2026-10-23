@@ -480,9 +480,8 @@ export async function prepareCronRunContext(params: {
         extraSystemPromptStatic: deliverySystemPrompt,
         sourceReplyDeliveryMode: usesExactRunSession
           ? sourceDelivery.sourceReplyDeliveryMode
-          : await resolveSessionStableReplyMode({
+          : resolveSessionStableReplyMode({
               cfg: admittedConfig,
-              metadataSnapshot: preparedModelRuntimeLease.snapshot.metadataSnapshot,
               ctx: { CommandAuthorized: false },
               sessionEntry: cronSession.sessionEntry,
               sessionAgentId: agentId,
