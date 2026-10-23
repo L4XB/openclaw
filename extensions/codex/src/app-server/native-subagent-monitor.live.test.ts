@@ -368,7 +368,7 @@ describeLive("codex native subagent monitor live", () => {
         const claims = new Map<string, string>();
         const releases = new Set<string>();
         const runGeneration = async (revision: string, requesterTurnRunId: string) => {
-          const requestCustody = Object.freeze({ revision });
+          const requestCustody = Object.freeze({});
           const releasePath = path.join(root, `${revision}.release`);
           const parent = await monitor.registerParent({
             parentThreadId,
