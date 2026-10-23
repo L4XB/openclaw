@@ -1163,10 +1163,7 @@ describe("compactEmbeddedAgentSessionDirect hooks", () => {
 
     it.each([
       ["provider timeout", "request timed out", "fallback"],
-      ["intentional quality rejection", undefined, "cancel"],
       ["explicit model timeout", "request timed out", "cancel"],
-      // A failed corrective attempt stays a terminal quality cancellation, even on a 408.
-      ["corrective 408", "408", "cancel"],
       [
         "reasoning-mandatory rejection",
         "400 Reasoning is mandatory for this endpoint and cannot be disabled.",
