@@ -325,6 +325,7 @@ export function prepareSessionRowSelection(
       projection.selectEntries(
         { agentId: selectedScope.agentId, sessionIdOrKey, sortBy: null },
         prepared.metadataPrepared === true,
+        "running-candidate",
       ),
     );
   const selected = selection.read(
@@ -348,6 +349,7 @@ export function prepareSessionRowSelection(
             .selectEntries(
               { agentId: selectedScope.agentId, sessionIdOrKey, sortBy: null },
               prepared?.metadataPrepared === true,
+              "running-candidate",
             )
             .map((row) =>
               sentinel(row.key) && activeOnly ? JSON.stringify([row.key, row.agentId]) : row.key,

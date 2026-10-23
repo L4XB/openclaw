@@ -285,6 +285,18 @@ export function createDiagnosticsMetrics(
       "By",
     ),
     memoryPressureCounter: createCounter("memory.pressure", "Diagnostic memory pressure events"),
+    sessionRowSelectionsCounter: createCounter(
+      "session.row.selections",
+      "Successful resident session-row selections by query shape and enclosing task",
+    ),
+    sessionRowSelectionRowsCounter: createCounter(
+      "session.row.selection.rows",
+      "Resident session rows selected before federation and visibility filtering",
+    ),
+    sessionRowSelectionResetsCounter: createCounter(
+      "session.row.selection.resets",
+      "Broad session-row selection invalidations, including topology replacement and disposal",
+    ),
     asyncQueueDroppedCounter: createCounter(
       "diagnostic.async_queue.dropped",
       "Async diagnostic queue drops by dropped event class",
