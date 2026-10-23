@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
@@ -25,9 +26,12 @@ import { createNestedToolActivity } from "../sessions/nested-tool-activity.js";
 import { createTestPluginRegistry } from "./registry-runtime.test-helpers.js";
 import { withPluginRuntimeRegistryScope } from "./runtime/gateway-request-scope.js";
 import { createPluginRecord } from "./status.test-helpers.js";
-import { bindPluginToolCallbacks } from "./tool-factory-runtime.js";
+import {
+  bindPluginToolCallbacks,
+  createPluginToolFactoryResolver,
+} from "./tool-factory-runtime.js";
 
-function fixture(version = 1) {
+function fixture(version = 1, frozenProxy = false) {
   const builder = createTestPluginRegistry(createPluginRuntimeMock());
   const record = createPluginRecord({
     id: "incidents",
@@ -55,13 +59,41 @@ function fixture(version = 1) {
         { version: 1, summary: "Showing incident INC-42." },
       ),
   };
-  api.registerTool(source);
+  api.registerTool(frozenProxy ? new Proxy(Object.freeze(source), {}) : source);
   const entry = builder.registry.tools[0]!;
-  const tool = bindPluginToolCallbacks(entry, builder.registry, source);
+  // Resolve the admitted factory result, not the original plugin-owned object.
+  const { resolved } = createPluginToolFactoryResolver((error) => assert.fail(error)).resolve(
+    entry,
+    {},
+    [source.name],
+  );
+  assert(resolved && !Array.isArray(resolved));
+  const tool = bindPluginToolCallbacks(entry, builder.registry, resolved);
   return { ...builder, api, tool };
 }
 
 describe("native inline tool results", () => {
+  it("binds frozen Proxy tools through registered factories and rejects retired calls", async () => {
+    const { registry, tool } = fixture(1, true);
+    const direct = await tool.execute("direct-proxy", {});
+    expect(asOptionalRecord(direct.details)?.pluginInlineViewInvocation).toEqual({
+      pluginId: "incidents",
+      toolName: "show_incident",
+      toolCallId: "direct-proxy",
+    });
+    const catalogRef = createToolSearchCatalogRef();
+    registerHeadlessToolSearchCatalog({ catalogRef, tools: [tool] });
+    const runtime = new ToolSearchRuntime({ catalogRef }, resolveToolSearchConfig());
+    const { result } = await runtime.call(tool.name, {}, { parentToolCallId: "proxy-parent" });
+    expect(asOptionalRecord(result.details)?.pluginInlineViewInvocation).toEqual({
+      pluginId: "incidents",
+      toolName: "show_incident",
+      toolCallId: "tool_call:proxy-parent:show_incident:1",
+    });
+    registry.plugins[0]!.enabled = false;
+    await expect(tool.execute("retired-proxy", {})).rejects.toThrow("no longer active");
+  });
+
   it("advertises inline mounts only to the current viewer scopes and Labs policy", () => {
     const { registry } = fixture();
     const registration = registry.controlUiDescriptors[0]!;
