@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import type { BrowserContext, Page } from "playwright";
 import { expect as expectBrowser } from "playwright/test";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, expect, it } from "vitest";
 import { createPlaybackMediaFixture } from "../../../test/fixtures/media-playback.js";
+import { captureControlUiE2eFailureDiagnostics } from "../test-helpers/control-ui-e2e-diagnostics.ts";
 import { controlUiSessionUrl, installMockGateway } from "../test-helpers/control-ui-e2e.ts";
 import { createControlUiSessionRow } from "../test-helpers/control-ui-session-fixtures.ts";
 import {
@@ -58,6 +59,17 @@ suite.define(() => {
   afterAll(async () => {
     if (context) {
       await suite.closeBrowserContext(context);
+    }
+  });
+
+  afterEach(async ({ task, signal }) => {
+    // Capture before the next case can navigate or recycle the shared page.
+    const failure: unknown = signal.aborted ? signal.reason : task.result?.errors?.[0];
+    if (failure !== undefined && page) {
+      await captureControlUiE2eFailureDiagnostics(page, {
+        error: failure instanceof Error ? failure : Object.assign(new Error(task.name), failure),
+        label: task.name,
+      });
     }
   });
 
