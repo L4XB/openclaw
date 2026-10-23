@@ -3,6 +3,7 @@ import { copyCodeModeControlToolIdentity } from "../../code-mode-control-tools.j
 import type { AgentTool } from "../../runtime/index.js";
 import { copyInternalToolExecutionPreparer } from "../../runtime/internal-hooks.js";
 import { copyToolInvocationMetadata } from "../../tool-invocation-metadata.js";
+import { copyAgentToolReplaySafety } from "../../tool-replay-safety.js";
 import type { ExtensionContext, ToolDefinition } from "../extensions/types.js";
 
 function toolDefinitionMetadata<TParams extends TSchema>(
@@ -37,6 +38,7 @@ export function wrapToolDefinition<
   };
   copyCodeModeControlToolIdentity(definition, tool);
   copyToolInvocationMetadata(definition, tool);
+  copyAgentToolReplaySafety(definition, tool);
   return copyInternalToolExecutionPreparer(definition, tool);
 }
 
@@ -54,5 +56,6 @@ export function createToolDefinitionFromAgentTool(tool: AgentTool): ToolDefiniti
   };
   copyCodeModeControlToolIdentity(tool, definition);
   copyToolInvocationMetadata(tool, definition);
+  copyAgentToolReplaySafety(tool, definition);
   return copyInternalToolExecutionPreparer(tool, definition);
 }
