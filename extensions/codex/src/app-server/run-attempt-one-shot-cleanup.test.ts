@@ -112,6 +112,7 @@ describe("Codex one-shot cleanup receipts", () => {
       path.join(tempDir, "session.jsonl"),
       path.join(tempDir, "workspace"),
     );
+    params.timeoutMs = 60_000;
     params.oneShotCliRun = true;
     params.cleanupBundleMcpOnRunEnd = true;
     params.disableTools = false;

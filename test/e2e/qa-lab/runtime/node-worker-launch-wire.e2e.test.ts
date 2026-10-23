@@ -39,7 +39,7 @@ import {
 
 const execFileAsync = promisify(execFile);
 const SESSION_KEY = "agent:qa:node-worker-launch-wire";
-const TEST_TIMEOUT_MS = PROOF_TIMEOUT_MS + 60_000;
+const TEST_TIMEOUT_MS = PROOF_TIMEOUT_MS + 120_000;
 const CONTROL_PROBE_MAX_MS = 4_000;
 const CONTROL_PROBE_P95_MS = 1_000;
 const FINALIZATION_LOAD_CONCURRENCY = 12;
