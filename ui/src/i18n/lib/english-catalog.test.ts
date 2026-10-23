@@ -2,6 +2,7 @@
 import { createEffect, createRoot, flush } from "@solidjs/signals";
 import { expect, it, vi } from "vitest";
 import { registerEnglishCatalog, t } from "../../lib/reactive/i18n.ts";
+import { registerBoardDocumentEnglish } from "../locales/en-board-document.ts";
 import { registerBoardWebsiteEnglish } from "../locales/en-board-website.ts";
 import { registerBoardEnglish } from "../locales/en-board.ts";
 import { registerChatSessionEnglish } from "../locales/en-chat-session.ts";
@@ -52,6 +53,13 @@ it("keeps shared session labels eager while lazy renderers extend their retained
 });
 
 it.each([
+  {
+    register: registerBoardDocumentEnglish,
+    activeKey: "kindWebsite",
+    activeText: "Webseite",
+    fallbackKey: "kindReport",
+    fallbackText: "Report",
+  },
   {
     register: registerBoardWebsiteEnglish,
     activeKey: "websiteOpen",

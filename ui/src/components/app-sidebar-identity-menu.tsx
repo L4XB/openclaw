@@ -5,9 +5,10 @@ import type { ApplicationNavigationOptions } from "../app/context.ts";
 import type { NativeGatewaysSnapshot } from "../app/native-gateways.runtime.ts";
 import { nativeGatewaysCapability } from "../app/native-gateways.runtime.ts";
 import type { ThemeMode } from "../app/theme.ts";
+import { registerUpdateActionsEnglish } from "../i18n/locales/en-update-actions.ts";
 import { KEYBOARD_SHORTCUT_COMBOS } from "../lib/keyboard-shortcut-contract.ts";
 import type { PresenceViewer } from "../lib/presence-users.ts";
-import { t } from "../lib/reactive/i18n.ts";
+import { registerEnglishCatalog, t } from "../lib/reactive/i18n.ts";
 import { requestDebugOverlayToggle } from "../pages/debug/debug-overlay-contract.ts";
 import { SidebarDropdown, renderSidebarMenuAction } from "./app-sidebar-nav-menus.tsx";
 import { SidebarBuildChip } from "./sidebar-build-chip.tsx";
@@ -21,6 +22,8 @@ import { Kbd, KeyboardShortcut } from "./solid/kbd.tsx";
 import { createMenuControls, type MenuEntry, type MenuItem } from "./solid/menu.tsx";
 import "./solid/viewer-facepile.tsx";
 import { ThemeModeToggle } from "./theme-mode-toggle.tsx";
+
+registerEnglishCatalog(registerUpdateActionsEnglish);
 
 type SidebarIdentityMenuParams = {
   position: { x: number; bottom: number; width: number; placement?: "right-end" };

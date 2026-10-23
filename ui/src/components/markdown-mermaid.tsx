@@ -16,14 +16,17 @@ import {
   Show,
 } from "solid-js";
 import { pruneMapToMaxSize } from "../../../src/infra/map-size.ts";
+import { registerMermaidEnglish } from "../i18n/locales/en-mermaid.ts";
 import { copyToClipboard } from "../lib/clipboard.ts";
-import { t } from "../lib/reactive/i18n.ts";
+import { registerEnglishCatalog, t } from "../lib/reactive/i18n.ts";
 import { defineSolidBridge, type SolidBridgeElement } from "../lib/solid-bridge.ts";
 import { resolveThemeColor } from "../lib/theme-color.ts";
 import { Icon } from "./solid/icon.tsx";
 import { Menu } from "./solid/menu.tsx";
 import mermaidStyles from "./markdown-mermaid.css?inline";
 import "./image-lightbox.tsx";
+
+registerEnglishCatalog(registerMermaidEnglish);
 
 declare module "@solidjs/web" {
   namespace JSX {

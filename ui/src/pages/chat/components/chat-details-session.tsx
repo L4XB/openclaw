@@ -4,6 +4,7 @@ import { Icon } from "../../../components/solid/icon.tsx";
 import type { MenuHandle } from "../../../components/solid/menu.tsx";
 import { createTextOverflow } from "../../../components/solid/text-overflow.ts";
 import { registerChatSessionEnglish } from "../../../i18n/locales/en-chat-session.ts";
+import { registerSessionProgressEnglish } from "../../../i18n/locales/en-session-progress.ts";
 import { sessionParticipantIdentityKey } from "../../../lib/chat/sender-label.ts";
 import { useOptionalApplication } from "../../../lib/reactive/context.ts";
 import { registerEnglishCatalog, t } from "../../../lib/reactive/i18n.ts";
@@ -28,6 +29,8 @@ import { ChatOutputsDesktop, getChatOutputsCount, hasChatDesktopOutputs } from "
 import { ChatPullRequests, type ChatPullRequestsProps } from "./chat-pull-requests.tsx";
 import { syncSessionPanelInputs, useSessionPanel } from "./chat-session-panel.tsx";
 import { ChatSummaryAutomations } from "./chat-summary-automations.tsx";
+
+registerEnglishCatalog(registerSessionProgressEnglish);
 
 registerEnglishCatalog(registerChatSessionEnglish);
 

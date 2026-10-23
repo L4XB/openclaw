@@ -1,10 +1,14 @@
 import { createMemo, For, Show } from "solid-js";
 import { parseBoardReport, type BoardReport } from "../../../../../src/boards/board-report.ts";
 import { BoardWidgetError } from "../../../components/board/board-widget-error.tsx";
+import { registerBoardDocumentEnglish } from "../../../i18n/locales/en-board-document.ts";
+import { registerEnglishCatalog } from "../../reactive/i18n.ts";
 import { t } from "../../reactive/i18n.ts";
 import { defineSolidBridge, type SolidBridgeElement } from "../../solid-bridge.ts";
 import type { BoardWidget } from "../types.ts";
 import "./report.css";
+
+registerEnglishCatalog(registerBoardDocumentEnglish);
 
 type ReportBlock = BoardReport["blocks"][number];
 type ReportWidgetProps = { widget?: BoardWidget };

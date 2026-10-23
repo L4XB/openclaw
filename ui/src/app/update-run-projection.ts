@@ -10,6 +10,9 @@ import {
   resolveUpdateRunIdentity,
 } from "../../../src/infra/update-run-report.ts";
 import { t } from "../i18n/index.ts";
+import { registerUpdateActionsEnglish } from "../i18n/locales/en-update-actions.ts";
+
+registerUpdateActionsEnglish();
 
 type OracleState = "pass" | "warn" | "fail" | "pending";
 

@@ -1,9 +1,12 @@
 import { For, createSignal } from "solid-js";
+import { registerChatDraftRecoveryEnglish } from "../../../i18n/locales/en-chat-draft-recovery.ts";
 import { copyToClipboard } from "../../../lib/clipboard.ts";
 import { downloadBlobFile } from "../../../lib/download.ts";
-import { t } from "../../../lib/reactive/i18n.ts";
+import { registerEnglishCatalog, t } from "../../../lib/reactive/i18n.ts";
 import { getChatAttachmentBlob } from "../attachment-payload-store.ts";
 import type { PrivateComposerDraft } from "./private-composer-recovery-dialog.tsx";
+
+registerEnglishCatalog(registerChatDraftRecoveryEnglish);
 
 export function PrivateComposerRecoveryDialog(
   props: PrivateComposerDraft & { finish: (discard: boolean) => void },

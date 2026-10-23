@@ -10,6 +10,8 @@ import { registerAgentCreationEnglish } from "../../ui/src/i18n/locales/en-agent
 import { registerAgentsHomeEnglish } from "../../ui/src/i18n/locales/en-agents-home.ts";
 import { registerApprovalsEnglish } from "../../ui/src/i18n/locales/en-approvals.ts";
 import { registerAppsEnglish } from "../../ui/src/i18n/locales/en-apps.ts";
+import { registerAssistantContextEnglish } from "../../ui/src/i18n/locales/en-assistant-context.ts";
+import { registerBoardDocumentEnglish } from "../../ui/src/i18n/locales/en-board-document.ts";
 import { registerBoardWebsiteEnglish } from "../../ui/src/i18n/locales/en-board-website.ts";
 import { registerBoardEnglish } from "../../ui/src/i18n/locales/en-board.ts";
 import { registerBrowserEnglish } from "../../ui/src/i18n/locales/en-browser.ts";
@@ -17,10 +19,14 @@ import { registerChatCameraEnglish } from "../../ui/src/i18n/locales/en-chat-cam
 import { registerChatCiEnglish } from "../../ui/src/i18n/locales/en-chat-ci.ts";
 import { registerChatCommandResultsEnglish } from "../../ui/src/i18n/locales/en-chat-command-results.ts";
 import { registerChatComposerEnglish } from "../../ui/src/i18n/locales/en-chat-composer.ts";
+import { registerChatDraftRecoveryEnglish } from "../../ui/src/i18n/locales/en-chat-draft-recovery.ts";
 import { registerChatGoalsEnglish } from "../../ui/src/i18n/locales/en-chat-goals.ts";
 import { registerChatMessageMetadataEnglish } from "../../ui/src/i18n/locales/en-chat-message-metadata.ts";
+import { registerChatOutputsEnglish } from "../../ui/src/i18n/locales/en-chat-outputs.ts";
 import { registerChatProviderReviewEnglish } from "../../ui/src/i18n/locales/en-chat-provider-review.ts";
+import { registerChatQuestionsEnglish } from "../../ui/src/i18n/locales/en-chat-questions.ts";
 import { registerChatSessionEnglish } from "../../ui/src/i18n/locales/en-chat-session.ts";
+import { registerChatSuggestionsEnglish } from "../../ui/src/i18n/locales/en-chat-suggestions.ts";
 import { registerChatToolContentEnglish } from "../../ui/src/i18n/locales/en-chat-tool-content.ts";
 import { registerClawsEnglish } from "../../ui/src/i18n/locales/en-claws.ts";
 import { registerCodeBlocksEnglish } from "../../ui/src/i18n/locales/en-code-blocks.ts";
@@ -43,9 +49,11 @@ import { registerMcpAppEnglish } from "../../ui/src/i18n/locales/en-mcp-app.ts";
 import { registerMcpEnglish } from "../../ui/src/i18n/locales/en-mcp.ts";
 import { registerMeetingsEnglish } from "../../ui/src/i18n/locales/en-meetings.ts";
 import { registerMemoryImportEnglish } from "../../ui/src/i18n/locales/en-memory-import.ts";
+import { registerMermaidEnglish } from "../../ui/src/i18n/locales/en-mermaid.ts";
 import { registerModelAccountsEnglish } from "../../ui/src/i18n/locales/en-model-accounts.ts";
 import { registerModelControlsEnglish } from "../../ui/src/i18n/locales/en-model-controls.ts";
 import { registerModelSetupEnglish } from "../../ui/src/i18n/locales/en-model-setup.ts";
+import { registerNativeLinkMenuEnglish } from "../../ui/src/i18n/locales/en-native-link-menu.ts";
 import { registerNewSessionSetupEnglish } from "../../ui/src/i18n/locales/en-new-session-setup.ts";
 import { registerPersonalInstructionsEnglish } from "../../ui/src/i18n/locales/en-personal-instructions.ts";
 import { registerPluginConsentEnglish } from "../../ui/src/i18n/locales/en-plugin-consent.ts";
@@ -59,6 +67,7 @@ import { registerSessionMachineEnglish } from "../../ui/src/i18n/locales/en-sess
 import { registerSessionOrganizationEnglish } from "../../ui/src/i18n/locales/en-session-organization.ts";
 import { registerSessionPeopleEnglish } from "../../ui/src/i18n/locales/en-session-people.ts";
 import { registerSessionPlacementEnglish } from "../../ui/src/i18n/locales/en-session-placement.ts";
+import { registerSessionProgressEnglish } from "../../ui/src/i18n/locales/en-session-progress.ts";
 import { registerSettingsEnglish } from "../../ui/src/i18n/locales/en-settings.ts";
 import { registerSidebarAttentionEnglish } from "../../ui/src/i18n/locales/en-sidebar-attention.ts";
 import { registerSkillLibraryEnglish } from "../../ui/src/i18n/locales/en-skill-library.ts";
@@ -70,6 +79,7 @@ import { registerToolDiagnosticsEnglish } from "../../ui/src/i18n/locales/en-too
 import { registerTranscriptsEnglish } from "../../ui/src/i18n/locales/en-transcripts.ts";
 import { registerUpdateActionsEnglish } from "../../ui/src/i18n/locales/en-update-actions.ts";
 import { registerUsageEnglish } from "../../ui/src/i18n/locales/en-usage.ts";
+import { registerWorkerCapacityEnglish } from "../../ui/src/i18n/locales/en-worker-capacity.ts";
 import { en } from "../../ui/src/i18n/locales/en.ts";
 import {
   mergeControlUiTranslationMaps,
@@ -84,6 +94,16 @@ const localesDir = path.resolve(
   "../../ui/src/i18n/locales",
 );
 const sourceFiles = [
+  "en-chat-draft-recovery.ts",
+  "en-mermaid.ts",
+  "en-session-progress.ts",
+  "en-board-document.ts",
+  "en-chat-questions.ts",
+  "en-assistant-context.ts",
+  "en-chat-outputs.ts",
+  "en-chat-suggestions.ts",
+  "en-native-link-menu.ts",
+  "en-worker-capacity.ts",
   "en.ts",
   "en-agents.ts",
   "en-about.ts",
@@ -222,7 +242,7 @@ export function loadControlUiSourceCatalog(): TranslationMap {
     }
   }
   const boardWidget: TranslationMap = {};
-  for (const [key, value] of Object.entries(en.board.widget)) {
+  for (const [key, value] of Object.entries(registerBoardDocumentEnglish.catalog.board.widget)) {
     boardWidget[key] = value;
     if (key === "remove") {
       Object.assign(boardWidget, registerBoardEnglish.catalog.board.widget);
@@ -231,13 +251,63 @@ export function loadControlUiSourceCatalog(): TranslationMap {
       Object.assign(boardWidget, registerBoardWebsiteEnglish.catalog.board.widget);
     }
   }
+  const chat: TranslationMap = {};
+  for (const [key, value] of Object.entries(en.chat)) {
+    const sourceKeys: Array<Exclude<keyof typeof registerSettingsEnglish.catalog.chat, "sidebar">> =
+      key === "sendShortcutModifierEnter"
+        ? ["sendShortcut", "sendShortcutHint", "sendShortcutEnter"]
+        : key === "followUpModeSteer"
+          ? ["followUpMode", "followUpModeQueue", "followUpModeServer", "followUpModeLoading"]
+          : key === "catalogOutputTruncated"
+            ? [
+                "followUpModeOverriding",
+                "followUpModeReset",
+                "catalogOpenTarget",
+                "catalogOpenTargetViewer",
+                "catalogOpenTargetTerminal",
+              ]
+            : [];
+    for (const sourceKey of sourceKeys) {
+      chat[sourceKey] = registerSettingsEnglish.catalog.chat[sourceKey];
+    }
+    if (key === "actions") {
+      chat.updating = registerUpdateActionsEnglish.catalog.chat.updating;
+    }
+    chat[key] = value;
+  }
+  const sidebar: TranslationMap = {};
+  for (const [key, value] of Object.entries(en.chat.sidebar)) {
+    if (key === "threads") {
+      Object.assign(sidebar, registerUpdateActionsEnglish.catalog.chat.sidebar);
+    }
+    if (key === "catalogGroupByProject") {
+      Object.assign(sidebar, registerSettingsEnglish.catalog.chat.sidebar);
+    }
+    sidebar[key] = value;
+  }
   // Read fragment data without registering it into the shared runtime catalog.
   // en.ts's empty anchors retain source order for extracted whole subtrees.
   return mergeControlUiTranslationMaps(
-    registerSkillLibraryEnglish.catalog,
+    {
+      skillDiscovery: registerSkillLibraryEnglish.catalog.skillDiscovery,
+      skillLibrary: registerSkillLibraryEnglish.catalog.skillLibrary,
+    },
     // Preserve partial-fragment key order while keeping shared labels eager.
     {
       ...en,
+      languages: registerSettingsEnglish.catalog.languages,
+      onboarding: registerMemoryImportEnglish.catalog.onboarding,
+      execApproval: registerApprovalsEnglish.catalog.execApproval,
+      browser: registerBrowserEnglish.catalog.browser,
+      sessionProgressCard: registerSessionProgressEnglish.catalog.sessionProgressCard,
+      assistantPanel: registerAssistantContextEnglish.catalog.assistantPanel,
+      outputs: registerChatOutputsEnglish.catalog.outputs,
+      nativeLinkMenu: registerNativeLinkMenuEnglish.catalog.nativeLinkMenu,
+      capacityMeter: registerWorkerCapacityEnglish.catalog.capacityMeter,
+      skillGroups: registerSkillLibraryEnglish.catalog.skillGroups,
+      skillStatus: registerSkillLibraryEnglish.catalog.skillStatus,
+      pluginUi: registerPluginManagementEnglish.catalog.pluginUi,
+      labsPage: { ...en.labsPage, swarm: registerLabsEnglish.catalog.labsPage.swarm },
       aboutPage: registerAboutEnglish.catalog.aboutPage,
       dashboardsPage: registerDashboardsEnglish.catalog.dashboardsPage,
       configForm: registerSettingsEnglish.catalog.configForm,
@@ -245,7 +315,7 @@ export function loadControlUiSourceCatalog(): TranslationMap {
       quickSettings: registerPreferencesEnglish.catalog.quickSettings,
       activityFeed: registerActivityEnglish.catalog.activityFeed,
       terminal: registerTerminalEnglish.catalog.terminal,
-      updates: { ...en.updates, run: registerUpdateActionsEnglish.catalog.updates.run },
+      updates: registerUpdateActionsEnglish.catalog.updates,
       agentChip,
       secretsStore: registerSecretsStoreEnglish.catalog.secretsStore,
       custodian: {
@@ -254,7 +324,13 @@ export function loadControlUiSourceCatalog(): TranslationMap {
         autoSetup: registerPluginManagementEnglish.catalog.custodian.autoSetup,
       },
       chat: {
-        ...en.chat,
+        ...chat,
+        sidebar,
+        privateDraftReload: registerChatDraftRecoveryEnglish.catalog.chat.privateDraftReload,
+        mermaid: registerMermaidEnglish.catalog.chat.mermaid,
+        questions: registerChatQuestionsEnglish.catalog.chat.questions,
+        sessionSuggestions: registerChatSuggestionsEnglish.catalog.chat.sessionSuggestions,
+        clawhub: registerPluginManagementEnglish.catalog.chat.clawhub,
         ...registerChatSessionEnglish.catalog.chat,
         commands: registerCommandPaletteEnglish.catalog.chat.commands,
         welcome: registerCommandPaletteEnglish.catalog.chat.welcome,
@@ -270,7 +346,7 @@ export function loadControlUiSourceCatalog(): TranslationMap {
         ...en.agentTools,
         ...registerToolDiagnosticsEnglish.catalog.agentTools,
       },
-      board: { ...en.board, widget: boardWidget },
+      board: { ...registerBoardDocumentEnglish.catalog.board, widget: boardWidget },
       newSession,
       sessionsView,
       shortcutsOverlay: registerCommandPaletteEnglish.catalog.shortcutsOverlay,

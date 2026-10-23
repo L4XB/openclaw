@@ -3,7 +3,23 @@
 import type { TranslationMap } from "../lib/types.ts";
 import * as agentEn from "./en-agents.ts";
 
-export const en: TranslationMap & {
+type EnglishCatalog = TranslationMap & {
+  languages: TranslationMap;
+  onboarding: TranslationMap & { memoryImport: TranslationMap };
+  execApproval: TranslationMap & { labels: TranslationMap; scope: TranslationMap };
+  sessionProgressCard: TranslationMap & {
+    refresh: TranslationMap;
+    activity: TranslationMap;
+    outcome: TranslationMap;
+    status: TranslationMap;
+  };
+  assistantPanel: TranslationMap;
+  outputs: TranslationMap;
+  nativeLinkMenu: TranslationMap;
+  capacityMeter: TranslationMap;
+  skillGroups: TranslationMap;
+  skillStatus: TranslationMap;
+  labsPage: TranslationMap & { swarm: TranslationMap };
   agentChip: TranslationMap;
   logbook: TranslationMap;
   gatewayLogs: TranslationMap;
@@ -22,8 +38,9 @@ export const en: TranslationMap & {
   githubPublication: TranslationMap & Record<"newAction" | "capacity", string>;
   githubConnections: TranslationMap &
     Record<"title" | "mine" | "system" | "forMe" | "forSystem", string>;
-  board: TranslationMap & { widget: TranslationMap };
+  board: TranslationMap & { announcement: TranslationMap; widget: TranslationMap };
   browser: TranslationMap & { errors: TranslationMap; annotatePrompt: TranslationMap };
+  pluginUi: TranslationMap & { surface: TranslationMap };
   shortcutsOverlay: TranslationMap & { title: string };
   chat: TranslationMap &
     Record<
@@ -48,6 +65,12 @@ export const en: TranslationMap & {
       | "sessionDiscussion",
       TranslationMap
     > & {
+      privateDraftReload: TranslationMap;
+      mermaid: TranslationMap;
+      questions: TranslationMap;
+      sessionSuggestions: TranslationMap & { state: TranslationMap };
+      clawhub: TranslationMap;
+      sidebar: TranslationMap;
       composer: TranslationMap;
       queue: TranslationMap;
       mentions: TranslationMap;
@@ -152,22 +175,22 @@ export const en: TranslationMap & {
     >;
   custodian: TranslationMap & { autoSetup: TranslationMap & { thisComputer: string } };
   debug: TranslationMap & {
-    lanes: TranslationMap & Record<"lane" | "active" | "queued" | "blocked", string>;
-    overlay: TranslationMap &
-      Record<
-        | "title"
-        | "eyebrow"
-        | "move"
-        | "minimize"
-        | "expand"
-        | "lanes"
-        | "status"
-        | "activeRuns"
-        | "events"
-        | "cpu"
-        | "memory"
-        | "delayP99",
-        string
+    lanes: TranslationMap & Partial<Record<"lane" | "active" | "queued" | "blocked", string>>;
+    overlay: TranslationMap & { title: string } & Partial<
+        Record<
+          | "eyebrow"
+          | "move"
+          | "minimize"
+          | "expand"
+          | "lanes"
+          | "status"
+          | "activeRuns"
+          | "events"
+          | "cpu"
+          | "memory"
+          | "delayP99",
+          string
+        >
       >;
   };
   // Lazy en-devices.ts assigns into this namespace.
@@ -194,10 +217,10 @@ export const en: TranslationMap & {
   filePreview: TranslationMap;
   updates: TranslationMap &
     Record<"confirm" | "dialog" | "triage" | "report", TranslationMap> & {
-      run: TranslationMap & Record<"restarting" | "progress", string> & { phase: TranslationMap };
+      run: TranslationMap &
+        Partial<Record<"restarting" | "progress", string>> & { phase: TranslationMap };
     };
   login: TranslationMap;
-  labsPage: TranslationMap;
   mcpServers: TranslationMap;
   mcpPage: TranslationMap;
   modelSetup: TranslationMap & {
@@ -305,44 +328,20 @@ export const en: TranslationMap & {
   systems: TranslationMap;
   talkPage: TranslationMap;
   usage: TranslationMap & { overview: TranslationMap; details: TranslationMap };
-} = {
+};
+
+const startupEnglish = {
   pluginUi: {
-    sessionRecentMessages: "Recent messages",
-    sessionHistoryUnavailable: "Session history could not be loaded. Try again.",
-    sessionHistoryEmpty: "No recent messages.",
-    customize: "Customize UI",
-    selectionScope: "Choose views for this browser window. Built-in views are always available.",
-    builtin: "Built-in view",
     retryView: "Retry plugin view",
-    reload: "Reload plugin UI",
+
     dashboardTitle: "Session dashboard",
-    dashboardEmpty: "This session has no dashboard widgets yet.",
-    customPluginsDisabled: "Custom plugin UI is off",
-    customPluginsEnableHint: "Enable Custom plugin UI in Labs.",
-    openLabs: "Open Labs",
-    surface: {
-      "session-list": "Session list",
-      composer: "Composer",
-      workspace: "Workspace",
-      transcript: "Transcript",
-      "tool-result": "Tool results",
-    },
+
+    surface: {},
   },
-  capacityMeter: {
-    workerSlots: "{used} of {total} slots busy",
-    unavailable: "Slot utilization unavailable",
-    execHost: "Codex exec",
-  },
+  capacityMeter: {},
   agentsHome: {},
   outputs: {
-    viewAll: "View all",
     dashboard: "Dashboard",
-    files: "Files",
-    loading: "Loading outputs…",
-    updating: "Updating outputs…",
-    loadingDashboard: "Loading dashboard…",
-    emptyTitle: "No outputs yet",
-    emptyDescription: "Files and dashboards from the session appear here.",
   },
   common: {
     uploadsDisabled: "File and image uploads are disabled.",
@@ -463,12 +462,7 @@ export const en: TranslationMap & {
   nativeConversation: {
     openDashboardFailed: "Couldn't open that page in the Dashboard",
   },
-  nativeLinkMenu: {
-    label: "Link actions",
-    openInline: "Open in Browser Panel",
-    openExternal: "Open in Default Browser",
-    copy: "Copy Link",
-  },
+  nativeLinkMenu: {},
   browserLinkPreferences: {
     openInControlUi: "Open links in Control UI browser",
   },
@@ -496,51 +490,15 @@ export const en: TranslationMap & {
     checks: {},
   },
   sessionProgressCard: {
-    title: "Progress",
     composerTitle: "Task progress",
-    stepCount: "Step {current} of {total}",
-    hide: "Hide this card",
-    noteLabel: "Progress note",
-    dismiss: "Dismiss progress card",
-    clearSaved: "Clear saved progress for everyone",
+
     clearFailed: "Could not clear saved progress card.",
-    refresh: {
-      label: "Refresh task progress",
-      retry: "Retry progress refresh",
-      pending: "Refreshing task progress…",
-      failed: "Could not refresh. Previous update kept.",
-      timeout: "No new update yet. The request may still be running.",
-      updated: "Task progress updated",
-    },
-    widgetLabel: "Session progress",
-    widgetLoading: "Loading session progress…",
-    widgetEmpty: "No progress card yet",
-    detailsEmptyTitle: "No saved progress",
-    detailsEmptyDescription: "Progress saved by this session appears here.",
-    showInChat: "Show in chat",
-    widgetUnavailable: "Session progress is unavailable.",
-    widgetAccessDenied: "Select a session you can access or change sharing for this session.",
-    countLabel: "{completed} of {total} completed",
-    activity: {
-      updated: "Updated {time}",
-      completed: "Completed {time}",
-      failed: "Failed {time}",
-      stopped: "Stopped {time}",
-    },
-    outcome: {
-      completed: "Completed",
-      failed: "Failed",
-      stopped: "Stopped",
-    },
-    stepLabel: "{step}, {status}",
-    status: {
-      completed: "completed",
-      failed: "failed",
-      inProgress: "in progress",
-      paused: "paused",
-      pending: "pending",
-      stopped: "stopped",
-    },
+    refresh: {},
+
+    activity: {},
+    outcome: {},
+
+    status: {},
     receipt: {
       updating: "Updating progress",
       failed: "Progress update failed",
@@ -596,58 +554,26 @@ export const en: TranslationMap & {
     followPlatform: "Follow OpenClaw on {platform}",
   },
   updates: {
-    adminRequired: "Administrator access is required to change update settings or start an update.",
-    refreshFailed: "Could not refresh. Check your connection and try again.",
     campaign: {
       countdown: "Updating in {time}",
       waitingForIdle: "Waiting for active work · forced update in {time}",
       held: "Update held · resumes in {time}",
       applying: "Applying update…",
     },
-    holdOneHour: "Hold 1 h",
-    reviewUpdate: "Review update",
+
     run: {
-      restarting: "Gateway restarting…",
-      progress: "{completed} of {total} phases complete",
-      phase: {
-        requested: "Requested",
-        staging: "Staging",
-        validating: "Validating",
-        repairing: "Repairing",
-        activating: "Activating",
-        restarting: "Restarting",
-        verifying: "Verifying",
-        finished: "Finished",
-      },
+      phase: {},
     },
-    confirm: {
-      action: "Update and restart",
-    },
+    confirm: {},
     target: {
       version: "v{version}",
       commitBehind: "{count} commit behind",
       commitsBehind: "{count} commits behind",
-      viewChanges: "Compare on GitHub",
     },
     sidebar: {
-      campaignTarget: "{status} · {target}",
-      checking: "Checking for updates…",
-      checkFailed: "Could not check the latest update. Try again.",
-      updating: "Updating Gateway…",
-      availableTitle: "Update available",
-      availableBadge: "Available",
-      availableSummary: "A newer revision is ready.",
-      blockedTitle: "Update blocked",
-      blockedSummary: "The selected revision could not be applied to this checkout.",
-      blockedWaiting: "Blocked · waiting for active work · {target}",
       waitingForIdle: "Waiting for active work",
     },
-    dialog: {
-      disconnected:
-        "The Gateway disconnected during the update. This page reconnects on its own. If it stays disconnected, run `openclaw triage` on the Gateway host to open a local coding agent for diagnosis and repair.",
-      restarting:
-        "The Gateway is restarting. This page disconnects and reconnects on its own. If it stays disconnected, run `openclaw triage` on the Gateway host to open a local coding agent for diagnosis and repair.",
-    },
+    dialog: {},
     channel: {},
     installKind: {},
     page: {},
@@ -898,25 +824,9 @@ export const en: TranslationMap & {
     files: {},
   },
   debug: {
-    lanes: {
-      lane: "Lane",
-      active: "Active",
-      queued: "Queued",
-      blocked: "Blocked",
-    },
+    lanes: {},
     overlay: {
       title: "System busyness",
-      eyebrow: "Live diagnostics",
-      move: "Move system busyness with arrow keys, or drag",
-      minimize: "Minimize system busyness",
-      expand: "Expand system busyness",
-      lanes: "Lanes",
-      status: "Event loop / status",
-      activeRuns: "Active runs",
-      events: "Events",
-      cpu: "CPU",
-      memory: "Memory",
-      delayP99: "Delay p99",
     },
   },
   configForm: {
@@ -969,18 +879,6 @@ export const en: TranslationMap & {
       "Cannot verify the raw draft against the saved configuration; reload and retry.",
   },
   execApproval: {
-    watcherApprovalScope:
-      "Approval applies to this saved watcher. Source changes or reactivation may require approval again.",
-    watcherSandboxSummary:
-      "Runs in your sandbox after you leave this chat, until stopped. Restarts automatically after interruptions.",
-    watcherGatewaySummary:
-      "Runs on the Gateway after you leave this chat, until stopped. Restarts automatically after interruptions.",
-    watcherSummary:
-      "Runs after you leave this chat, until stopped. Restarts automatically after interruptions.",
-    startWatcher: "Start watching",
-    saveWatcher: "Save watcher change",
-    cancelWatcher: "Cancel",
-
     scope: {
       standingGrant:
         'Always allow runs this exact command for "{automation}" without asking, until revoked (revocable)',
@@ -990,54 +888,19 @@ export const en: TranslationMap & {
       payment: "Pays {amount} {currency} to {target}",
       externalPost: "Posts externally to {target}",
     },
-    expiresIn: "expires in {time}",
-    expired: "expired",
-    execApprovalNeeded: "Exec approval needed",
-    runCommand: "Run this command?",
-    pluginApprovalNeeded: "Plugin approval needed",
-    requestedBySession: "Approval requested by session {session}",
-    pending: "{count} pending",
-    otherPending: "Other pending requests",
-    reviewRequest: "Review approval from {agent}: {command}",
-    decisionRequest: "{decision}: {command}",
+
     agentPendingOne: "{count} pending approval",
     agentPending: "{count} pending approvals",
-    allowOnce: "Allow once",
-    alwaysAllow: "Always allow",
-    alwaysAllowHere: "Always allow here",
-    allowAlwaysUnavailable: "Allow Always is unavailable for this command.",
+
     reviewOnly: "Review only. Sign in with approval access to record a decision.",
-    deny: "Deny",
-    details: "Details",
-    labels: {
-      host: "Host",
-      session: "Session",
-      cwd: "CWD",
-      directory: "Directory",
-      resolved: "Resolved",
-      security: "Security",
-      ask: "Ask",
-    },
+
+    labels: {},
   },
   approvalPage: {},
   agentTools: {},
-  skillGroups: {
-    workspace: "Workspace Skills",
-    learned: "Learned Skills",
-    builtIn: "Built-in Skills",
-    installed: "Installed Skills",
-    extra: "Extra Skills",
-    other: "Other Skills",
-  },
+  skillGroups: {},
   skillsPage: {},
-  skillStatus: {
-    bundled: "bundled",
-    eligible: "eligible",
-    blocked: "blocked",
-    disabled: "disabled",
-    blockedAllowlist: "blocked by allowlist",
-    blockedAgentFilter: "blocked by agent filter",
-  },
+  skillStatus: {},
   nav: {
     gateway: {
       sectionLabel: "Gateway",
@@ -1090,10 +953,6 @@ export const en: TranslationMap & {
     unavailable: "The terminal is not available on this gateway.",
   },
   browser: {
-    nativeTab: "App tab",
-    remoteTab: "Agent browser tab",
-    stop: "Stop loading",
-    profile: "Browser profile: {profile}",
     title: "Browser",
     open: "Open",
     openPanel: "Open browser panel",
@@ -1102,33 +961,15 @@ export const en: TranslationMap & {
     openNewTab: "Open in new tab",
     openWithinOpenClaw: "Open in OpenClaw",
     toggle: "Toggle browser panel",
-    close: "Close browser panel",
-    resize: "Resize browser panel",
+
     newTab: "New tab",
     closeTab: "Close tab",
-    untitledTab: "New tab",
+
     tweetPost: "Post on X",
     openPost: "Open post",
-    back: "Back",
-    forward: "Forward",
-    reload: "Reload",
+
     openExternal: "Open in your browser",
-    urlPlaceholder: "Enter a URL and press Enter",
-    dockBottom: "Dock to bottom",
-    dockRight: "Dock to right",
-    annotate: "Annotate page",
-    inspect: "Inspect element",
-    annotateSend: "Send to chat",
-    annotateUndo: "Undo",
-    annotateClear: "Clear",
-    annotateDone: "Exit annotate mode",
-    annotateHint: "Draw on the page, then send the markup to your chat.",
-    inspectName: "Name",
-    inspectRole: "Role",
-    inspectFocusable: "Focusable",
-    loading: "Loading page…",
-    notRunning: "The gateway browser is not running.",
-    start: "Start browser",
+
     errors: {},
     annotatePrompt: {},
   },
@@ -1305,22 +1146,6 @@ export const en: TranslationMap & {
   onboarding: {
     memoryImport: {
       title: "Bring your assistant memory with you",
-      body: "OpenClaw found memory from other coding assistants. Import it into your agent workspace?",
-      plannedCount: "{count} ready to import",
-      alreadyImported: "Already imported: {count}",
-      sourceUnavailable: "Source path unavailable",
-      import: "Import",
-      skip: "Skip",
-      reviewDetails: "Review details",
-      importingProvider: "Importing…",
-      providerResult: "Migrated {migrated}, skipped {skipped}",
-      providerIncomplete:
-        "Migrated {migrated}, skipped {skipped}, {errors} failed, {conflicts} conflicts",
-      providerError: "Import failed: {error}",
-      connectionChanged: "Skipped: the Gateway connection changed during the import",
-      unknownError: "Request failed",
-      doneTitle: "Memory import finished",
-      doneBody: "Migrated {migrated}, skipped {skipped}. You can continue setting up OpenClaw.",
     },
   },
   assistantPanel: {
@@ -1332,13 +1157,8 @@ export const en: TranslationMap & {
     resize: "Resize assistant sidebar",
     dockBottom: "Dock assistant sidebar at bottom",
     dockRight: "Dock assistant sidebar at right",
-    context: "Working on: {context}",
+
     contextOff: "Work context off",
-    removeContext: "Remove work context",
-    includeContext: "Include work context",
-    selection: "Selected text",
-    attachSelection: "Attach selected text",
-    removeSelection: "Remove selected text",
   },
   custodian: {
     title: {},
@@ -1390,18 +1210,8 @@ export const en: TranslationMap & {
 
     swarm: {
       title: "Swarm",
-      groupTitle: "Parallel tasks",
+
       defaultPhase: "Unphased",
-      progress: "{complete} of {total}",
-      active: "{running} running · {queued} queued · {failed} failed or stopped",
-      finished: "{done} completed · {failed} failed or stopped",
-      completed: "{done} completed",
-      failedOrStopped: "Failed or stopped",
-      childOutcome: "Child runs finished. Check the conversation for the final response.",
-      childOutcomeProcessing: "Child runs finished. The parent is processing their results.",
-      details: "Child details",
-      detailsUnavailable: "Child details are unavailable. Counts include all accepted workers.",
-      otherGroups: "{count} more active groups",
     },
     toolSearch: {},
 
@@ -1531,25 +1341,8 @@ export const en: TranslationMap & {
   },
   logbook: {},
   board: {
-    label: "Session dashboard",
-    tabsLabel: "Dashboard tabs",
-    moreTabs: "More dashboard tabs",
-    gridLabel: "Dashboard widgets",
-    emptyTitle: "A clear board, ready for work",
-    emptyHint: "Your agent can pin widgets here — try asking for a status card.",
-    actionFailed: "The dashboard change could not be saved.",
-    actionInProgress: "Another dashboard change is still being saved.",
-    announcement: {
-      moved: "Moved {title}.",
-      resized: "Resized {title}.",
-      removed: "Removed {title}.",
-      granted: "Widget access allowed.",
-      rejected: "Widget access rejected.",
-    },
+    announcement: {},
     widget: {
-      cellLabel:
-        "Dashboard widget: {title}. Use arrow keys to navigate. Hold Alt and press an arrow key to move it.",
-      moveHandle: "Move {title}",
       resizeHandle: "Resize {title}",
       menuLabel: "Widget options",
       moveToTab: "Move to tab",
@@ -1557,14 +1350,6 @@ export const en: TranslationMap & {
       resize: "Resize",
       autoHeight: "Auto height",
       remove: "Delete",
-      kindMcp: "MCP",
-      kindHtml: "HTML",
-      kindPlugin: "Plugin",
-      kindReport: "Report",
-      kindWebsite: "Website",
-      kindBrowserDashboard: "Browser dashboard",
-      pluginLoading: "Loading plugin widget…",
-      disabledPlugin: "Widget from disabled plugin {pluginId}",
     },
   },
   connection: {
@@ -1789,10 +1574,7 @@ export const en: TranslationMap & {
     },
     agentDatabaseWarming: "This agent is still starting. Retry in a moment.",
     historyRequestTimedOut: "Chat history request timed out. Retry to load the conversation.",
-    clawhub: {
-      retryStatus: "Status unavailable · Retry",
-      viewDetails: "View details",
-    },
+    clawhub: {},
     modelAccounts: {
       section: "Account",
       automatic: "Automatic (new-chat default)",
@@ -1912,10 +1694,7 @@ export const en: TranslationMap & {
       suggest: "Suggest",
       suggestMessage: "Suggest message",
       attachmentsUnsupported: "Remove attachments before submitting a text suggestion.",
-      sendNow: "Send {author}'s suggestion now",
-      queue: "Queue {author}'s suggestion",
-      edit: "Edit {author}'s suggestion",
-      dismiss: "Dismiss {author}'s suggestion",
+
       typing: "{name} is typing…",
       typingMany: "{names} are typing…",
       typingSeveral: "Several people are typing…",
@@ -1923,11 +1702,7 @@ export const en: TranslationMap & {
       otherCollaborators: "Other collaborators",
       typingDraftState: "is typing...",
       pausedDraftState: "Draft",
-      state: {
-        pending: "Pending",
-        accepted: "Accepted",
-        dismissed: "Dismissed",
-      },
+      state: {},
     },
     sessionHeader: {},
     board: {},
@@ -1957,26 +1732,16 @@ export const en: TranslationMap & {
     },
     usageRemaining: "Usage Remaining",
     view: {},
-    sendShortcut: "Send shortcut",
-    sendShortcutHint:
-      "Desktop only. On mobile, Enter adds a new line; use the Send button to send.",
-    sendShortcutEnter: "Enter",
+
     sendShortcutModifierEnter: "⌘/Ctrl+Enter",
-    followUpMode: "Follow-ups while the agent is working",
-    followUpModeQueue: "Queue until the run ends",
-    followUpModeServer: "Server default ({mode})",
-    followUpModeLoading: "loading…",
+
     followUpModeSteer: "Steer into the active run",
-    followUpModeOverriding: "Overriding server default ({mode})",
-    followUpModeReset: "Reset to server default",
-    catalogOpenTarget: "Open external sessions in",
-    catalogOpenTargetViewer: "OpenClaw viewer",
-    catalogOpenTargetTerminal: "Terminal",
+
     catalogOutputTruncated: "[Output truncated]",
     onboardingDisabled: "Disabled during setup",
     commandPaletteTitle: "Search or jump to… (⌘K)",
     openCommandPalette: "Command palette",
-    updating: "Updating…",
+
     actions: {
       copyAsMarkdown: "Copy as markdown",
       dismissError: "Dismiss error",
@@ -1987,18 +1752,8 @@ export const en: TranslationMap & {
       truncated: "… truncated ({total} chars, showing first {shown}).",
     },
     mermaid: {
-      title: "Mermaid diagram",
-      options: "Diagram options",
-      diagram: "Show diagram",
-      source: "Show source",
-      copySource: "Copy source",
-      expand: "Expand diagram",
-      expandNamed: "Expand diagram: {title}",
-      rendering: "Rendering diagram…",
-      error: "This diagram could not be rendered. Check the source or simplify the diagram.",
       rendererError:
         "The Mermaid renderer could not load or finish. Reload the dashboard; if this continues, check proxy or authentication rules for its renderer asset URLs.",
-      imageError: "The diagram image could not be displayed. Reload the dashboard to try again.",
     },
     codeBlock: {},
     workspaceConflict: {},
@@ -2040,23 +1795,10 @@ export const en: TranslationMap & {
     privateDraftReload: {
       blocked: "An unsent Incognito draft is keeping this tab open. Review it before refreshing.",
       review: "Review private draft",
-      title: "Unsent Incognito draft",
-      description:
-        "This draft stays only in this tab. Copy its text or download its attachments before discarding it to refresh. Keeping this tab open leaves the draft unchanged.",
-      text: "Draft text",
-      copy: "Copy text",
-      goal: "This draft includes an unsent goal change.",
-      reading:
-        "Some attachments are still being read. Keep this tab open, then review the draft again when they finish.",
+
       changed:
         "The draft changed while you were reviewing it. It has not been discarded; review the current draft before refreshing.",
-      copyFailed:
-        "The text could not be copied. Select it in the draft field and copy it manually.",
-      attachmentUnavailable:
-        "This attachment is no longer available to download. Keep the draft open and recover the original file before discarding it.",
-      download: "Download {name}",
-      discard: "Discard this draft and refresh",
-      keep: "Keep in this tab",
+
       unavailable:
         "The private draft could not be opened. It remains in this tab; try Review private draft again.",
     },
@@ -2158,10 +1900,7 @@ export const en: TranslationMap & {
     },
     sidebar: {
       mySessions: "My sessions",
-      updateMacAndGateway: "Update Mac app + Gateway",
-      updateGateway: "Update Gateway",
-      serverUpdatedTitle: "Server updated",
-      serverUpdatedRefresh: "Refresh for full capabilities",
+
       threads: "Sessions",
       pinned: "Pinned",
       otherSessions: "Other",
@@ -2174,8 +1913,7 @@ export const en: TranslationMap & {
       hideFromSidebar: "Hide from sidebar",
       sectionHidden: "{section} hidden.",
       sectionHiddenRecovery: "Show it again in Settings > Appearance > Sidebar.",
-      hiddenSessionSections: "Hidden session sections",
-      showSessionSection: "Show",
+
       catalogGroupByProject: "Project",
       catalogGroupByPerson: "Person",
       openSessionMenu: "Open session menu",
@@ -2214,40 +1952,20 @@ export const en: TranslationMap & {
     goals: {},
     asyncQuestions: {},
     questions: {
-      showSecret: "Show secret",
-      hideSecret: "Hide secret",
-      resourcePreview: "Preview resource",
       addResources: "Add resources",
-      resourceUploadTooLarge: "Selected resources exceed the upload limits.",
-      other: "Type your own answer here",
-      multilineHint: "Enter adds a line · {shortcut} to continue",
+
       answer: "Answer",
-      answerPlaceholder: "{label}",
-      openLink: "Open link",
-      externalStepHint: "Complete the step in the new tab, then return here to submit your answer.",
-      submit: "Submit",
-      next: "Next",
-      back: "Back",
-      skip: "Skip",
-      skipping: "Skipping…",
+
       skipped: "Skipped",
-      collapse: "Collapse question",
-      expand: "Expand question",
+
       eyebrow: "Waiting for your answer",
       summaryLabel: "Question outcome",
-      ownAnswerFor: "Your own answer for {header}",
-      storeRequestedBy: "Requested by {agent} · {session}",
-      storeEntry: "Stores {name} as {kind}",
-      storeReplacement: "Replaces {name} — last updated {updated}",
-      storeReplacementBy: "Replaces {name} — last updated {updated} by {updatedBy}",
-      submitting: "Submitting…",
-      submitFailed: "Could not submit: {error}",
+
       answered: "Answered",
       answeredElsewhere: "Answered elsewhere",
       unavailable: "Unavailable",
       expired: "Expired",
       disconnected: "Not connected. Try again after reconnecting.",
-      loadFailed: "Could not load this question. Try again.",
     },
     imageLightbox: {
       loadingDetail: "Loading sharper image…",
@@ -2555,30 +2273,7 @@ export const en: TranslationMap & {
     },
   },
 
-  languages: {
-    en: "English",
-    zhCN: "简体中文 (Simplified Chinese)",
-    zhTW: "繁體中文 (Traditional Chinese)",
-    ptBR: "Português (Brazilian Portuguese)",
-    de: "Deutsch (German)",
-    es: "Español (Spanish)",
-    jaJP: "日本語 (Japanese)",
-    ko: "한국어 (Korean)",
-    fr: "Français (French)",
-    hi: "हिन्दी (Hindi)",
-    ar: "العربية (Arabic)",
-    it: "Italiano (Italian)",
-    tr: "Türkçe (Turkish)",
-    uk: "Українська (Ukrainian)",
-    id: "Bahasa Indonesia (Indonesian)",
-    pl: "Polski (Polish)",
-    th: "ไทย (Thai)",
-    vi: "Tiếng Việt (Vietnamese)",
-    nl: "Nederlands (Dutch)",
-    fa: "فارسی (Persian)",
-    ru: "Русский (Russian)",
-    sv: "Svenska (Swedish)",
-  },
+  languages: {},
   // Navigation and in-chat secret requests render before the Secrets page loads.
   secretsStore: {
     allowedHosts: "Allowed hosts",
@@ -2646,4 +2341,6 @@ export const en: TranslationMap & {
     title: "Link reader",
     urlPlaceholder: "Supported link URL",
   },
-};
+} satisfies TranslationMap;
+
+export const en: typeof startupEnglish & EnglishCatalog = startupEnglish;
