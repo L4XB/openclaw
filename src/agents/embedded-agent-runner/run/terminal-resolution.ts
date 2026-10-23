@@ -470,6 +470,9 @@ async function completeEmbeddedRun(
     input.terminalState.outcome.error ??
     input.incompleteTurnText ??
     MISSING_REPLY_NOTICE_TEXT;
+  const storageFailureText = renderStorageFailureSummary(
+    classifyGatewayStorageFailure(terminalFailure),
+  );
   // Warning suppression is presentation only: an unrecovered terminal failure
   // must retain error metadata and must not enter successful auth/trace bookkeeping.
   const error =
@@ -477,9 +480,7 @@ async function completeEmbeddedRun(
     classifyAgentRunTerminalOutcome(input.terminalState.outcome) === "failure"
       ? {
           kind: "incomplete_turn" as const,
-          message:
-            renderStorageFailureSummary(classifyGatewayStorageFailure(terminalFailure)) ??
-            formatErrorMessage(terminalFailure),
+          message: storageFailureText ?? formatErrorMessage(terminalFailure),
           fallbackSafe: input.incompleteTurnFallbackSafe ?? false,
           terminalPresentation: input.terminalToolPresentation !== undefined,
         }
@@ -585,7 +586,7 @@ async function completeEmbeddedRun(
   const incompleteText =
     input.terminalToolPresentation && input.incompleteTurnText !== undefined
       ? input.terminalToolPresentation.concat("\n\n", input.incompleteTurnText)
-      : input.incompleteTurnText;
+      : (input.incompleteTurnText ?? (error ? storageFailureText : undefined));
   const terminalPayloads = suppressMissingReplyNotice
     ? retainSilentFinalPayloads(input.payloadsForTerminalPath ?? [])
     : incompleteText !== undefined

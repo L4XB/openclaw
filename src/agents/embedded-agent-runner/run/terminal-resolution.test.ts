@@ -171,6 +171,8 @@ describe("terminal resolution", () => {
         fallbackSafe: false,
       });
       expect(input.sessionPromptState.activateInternalPrompt).not.toHaveBeenCalled();
+      expect(resolved.result.payloads).toHaveLength(1);
+      expect(resolved.result.payloads?.[0]).toMatchObject({ isError: true });
       const cron = resolveCronPayloadOutcome({
         payloads: resolved.result.payloads ?? [],
         runLevelError: resolved.result.meta.error,
@@ -180,6 +182,7 @@ describe("terminal resolution", () => {
       expect(cron.hasFatalErrorPayload).toBe(true);
       for (const text of [
         resolved.result.meta.error?.message,
+        ...(resolved.result.payloads ?? []).map((payload) => payload.text),
         cron.summary,
         cron.embeddedRunError,
         ...cron.deliveryPayloads.map((p) => p.text),
@@ -190,26 +193,35 @@ describe("terminal resolution", () => {
     },
   );
 
-  it("keeps external cancellation ahead of a failed attempt during final result construction", async () => {
-    const assistant = emptyAssistant({ stopReason: "stop" });
-    const attempt = makeEmbeddedRunnerAttempt({
-      terminal: { kind: "failed", source: "prompt", error: new Error("Late provider failure") },
-      lastToolError: { toolName: "exec", error: "Tool execution aborted" },
-      currentAttemptAssistant: assistant,
-      replayMetadata: { hadPotentialSideEffects: true, replaySafe: false },
-    });
-    const terminalState = resolveEmbeddedRunAttemptTerminalState({
-      attempt,
-      assistant,
-      abortSignal: AbortSignal.abort(),
-    });
-    const input = makeTerminalInput({ attempt, terminalState });
-    const resolved = await resolveEmbeddedRunTerminal(input);
-    expectComplete(resolved);
-    expect(resolved.result.meta).toMatchObject({ aborted: true, livenessState: "blocked" });
-    expect(resolved.result.meta.error).toBeUndefined();
-    expect(input.sessionPromptState.activateInternalPrompt).not.toHaveBeenCalled();
-  });
+  it.each([
+    new Error("Late provider failure"),
+    decodePostgresError({ name: "error", message: "Late database cancellation", code: "57014" }),
+  ])(
+    "keeps external cancellation ahead of a failed attempt during final result construction (%s)",
+    async (error) => {
+      const assistant = emptyAssistant({ stopReason: "stop" });
+      const attempt = makeEmbeddedRunnerAttempt({
+        terminal: { kind: "failed", source: "prompt", error },
+        lastToolError: { toolName: "exec", error: "Tool execution aborted" },
+        currentAttemptAssistant: assistant,
+        replayMetadata: { hadPotentialSideEffects: true, replaySafe: false },
+      });
+      const terminalState = resolveEmbeddedRunAttemptTerminalState({
+        attempt,
+        assistant,
+        abortSignal: AbortSignal.abort(),
+      });
+      const input = makeTerminalInput({ attempt, terminalState });
+      const resolved = await resolveEmbeddedRunTerminal(input);
+      expectComplete(resolved);
+      expect(resolved.result.meta).toMatchObject({ aborted: true, livenessState: "blocked" });
+      expect(resolved.result.meta.error).toBeUndefined();
+      expect(resolved.result.payloads ?? []).not.toContainEqual(
+        expect.objectContaining({ isError: true }),
+      );
+      expect(input.sessionPromptState.activateInternalPrompt).not.toHaveBeenCalled();
+    },
+  );
 
   it("completes NO_REPLY from an internal notification without retrying", async () => {
     const assistant = textAssistant(SILENT_REPLY_TOKEN);
