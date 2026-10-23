@@ -44,6 +44,7 @@ export async function createQuestionUpgradeFixture(stableRoot: string, signal: A
       // The instance still retains its logical port claim through stop/restart and cleanup.
       reserveIdlePort: false,
       config: {
+        logging: { file: "${OPENCLAW_STATE_DIR}/upgrade-gateway.log" },
         update: { checkOnStart: false },
         browser: { enabled: false },
         discovery: { mdns: { mode: "off" } },
@@ -61,6 +62,7 @@ export async function createQuestionUpgradeFixture(stableRoot: string, signal: A
         },
         models: {
           mode: "merge",
+          catalogRefresh: { enabled: false },
           providers: {
             [model.providerId]: {
               ...model.config,

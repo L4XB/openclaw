@@ -125,10 +125,12 @@ export function installQuestionTestHooks(options?: { waitForRecovery?: () => Pro
 export async function callQuestionRpc(
   method: string,
   params: Record<string, unknown>,
-  options?: { client?: GatewayClient; cfg?: OpenClawConfig; registered?: true } & Pick<
-    GatewayRequestOptions,
-    "hasCurrentClientAuthority"
-  >,
+  options?: {
+    client?: GatewayClient;
+    clients?: readonly GatewayClient[];
+    cfg?: OpenClawConfig;
+    registered?: true;
+  } & Pick<GatewayRequestOptions, "hasCurrentClientAuthority">,
 ) {
   const calls: Parameters<RespondFn>[] = [];
   const respond: RespondFn = (...args) => calls.push(args);
@@ -143,6 +145,12 @@ export async function callQuestionRpc(
     context: createDirectChatContext({
       broadcast,
       questionManager: manager,
+      getClientConnIds: (predicate = () => true) =>
+        new Set(
+          (options?.clients ?? [])
+            .filter(predicate)
+            .flatMap((client) => (client.connId ? [client.connId] : [])),
+        ),
       validateAgentRuntimeApprovalAuthority: createAgentRuntimeApprovalAuthorityValidator(),
       getRuntimeConfig: () => cfg,
     }),

@@ -93,7 +93,6 @@ export {
   loadSessionEntryByIdReadOnly,
   loadSessionEntryReadOnly,
   withSessionEntryReadOnlyScope,
-  resolveSessionKeyBySessionId,
   loadSessionEntryReadOnlyInScope,
 } from "./session-accessor.sqlite-exact-read.js";
 
