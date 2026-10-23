@@ -14,7 +14,6 @@ import {
   type MarginCase,
 } from "./chat-mobile-bubble-margin.test-support.ts";
 import { createControlUiE2eSuite } from "./control-ui-e2e-suite.test-support.ts";
-import { selectAllSidebarSessions } from "./sidebar-navigation.test-support.ts";
 
 const suite = createControlUiE2eSuite({
   name: "Mobile transcript bubble gutters",
@@ -112,7 +111,6 @@ suite.define(() => {
         await page.goto(controlUiSessionUrl(suite.server.baseUrl, sessionKey(testCase)), {
           waitUntil: "domcontentloaded",
         });
-        await selectAllSidebarSessions(page);
       } else {
         await page
           .locator(
@@ -120,6 +118,7 @@ suite.define(() => {
           )
           .click();
       }
+      await page.mouse.move(0, 0);
       const activePane = page.locator(".chat-pane-cache__pane--active");
       await expectBrowser(activePane).toHaveJSProperty("sessionKey", sessionKey(testCase));
       const measure = () => measureMargin(page, testCase);

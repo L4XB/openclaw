@@ -186,6 +186,8 @@ export async function createMarginImage(
 }
 
 export async function resizeMarginViewport(page: Page, width: number): Promise<void> {
+  // Sidebar clicks can hover media after resize; measure gutters without its 1.02 hover scale.
+  await page.mouse.move(0, 0);
   await page.setViewportSize({ width, height: 1200 });
   // Excluded cases have no mobile measurement between resizes. Await native
   // layout publication before issuing the desktop restore.
