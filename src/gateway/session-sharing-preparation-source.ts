@@ -98,6 +98,10 @@ export async function prepareCapturedSessionSharingSource(params: {
       membership: current.membership,
     };
   };
+  const pending = retained.prepareRead();
+  if (pending) {
+    await pending;
+  }
   readFacts();
   return { storageTarget, assertSource, readFacts };
 }
