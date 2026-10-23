@@ -42,6 +42,129 @@ def native_message(content, chat_id=-1001, message_id=42 << 20, sender_id=101):
     }
 
 
+class DmTopicTest(unittest.TestCase):
+    def instance(self, *, fail_create=False, fail_delete=False):
+        def request(payload):
+            kind = payload["@type"]
+            if kind == "getMe":
+                return {"id": 123}
+            if kind == "createPrivateChat":
+                return {"id": 42}
+            if kind == "createForumTopic":
+                if fail_create:
+                    raise driver.DriverError("Timed out after creation")
+                return {"forum_topic_id": 777}
+            if kind == "getForumTopics":
+                return {"topics": [{"info": {"name": payload["query"], "forum_topic_id": 777}}]}
+            if kind == "deleteForumTopic":
+                if fail_delete:
+                    raise driver.DriverError("Deletion denied")
+                return {"@type": "ok"}
+            raise AssertionError(f"Unexpected native method: {kind}")
+        return SimpleNamespace(
+            config={"testDc": True, "testerUserId": "123"}, bot_config={},
+            client=SimpleNamespace(request=Mock(side_effect=request)),
+        )
+
+    def test_mini_app_url_is_private_and_removed_even_when_the_browser_fails(self):
+        secret_url = "https://example.invalid/?tgWebAppData=synthetic-private-session"
+        for code in (0, 1):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as root:
+                native = Mock(side_effect=[
+                    {"id": 900, "type": {"user_id": 900}}, {"url": secret_url},
+                ])
+                instance = SimpleNamespace(client=SimpleNamespace(request=native))
+                def browser(argv, **_options):
+                    url_file = Path(argv[2])
+                    self.assertEqual(url_file.parent, Path(root))
+                    self.assertEqual(url_file.stat().st_mode & 0o777, 0o600)
+                    self.assertEqual(url_file.read_text(), secret_url)
+                    self.assertNotIn(secret_url, argv)
+                    return SimpleNamespace(
+                        returncode=code, stdout='{"before":false,"after":true}', stderr=secret_url,
+                    )
+                with patch.dict(driver.os.environ, {"TMPDIR": root}), \
+                     patch.object(driver.subprocess, "run", side_effect=browser):
+                    if code:
+                        with self.assertRaisesRegex(driver.DriverError, "^BotFather Threaded Mode action failed\\.$"):
+                            driver.set_bot_threaded_mode(instance, {"sutUsername": "leased_bot"}, True)
+                    else:
+                        self.assertTrue(driver.set_bot_threaded_mode(instance, {"sutUsername": "leased_bot"}, True)["after"])
+                self.assertEqual(list(Path(root).iterdir()), [])
+                self.assertEqual([call.args[0]["@type"] for call in native.call_args_list],
+                                 ["searchPublicChat", "getMainWebApp"])
+
+    def test_run_owned_dm_topic_is_deleted_and_threaded_mode_is_restored(self):
+        instance = self.instance()
+        mode = Mock(side_effect=lambda _driver, _identity, enabled: {"before": not enabled, "after": enabled})
+        with tempfile.TemporaryDirectory() as root, \
+             patch.object(driver, "resolve_sut", return_value={"id": "42", "username": "leased_bot"}), \
+             patch.object(driver, "set_bot_threaded_mode", mode):
+            manifest = Path(root) / "dm-topic.json"
+            self.assertEqual(driver.prepare_dm_topic(instance, manifest)["forumTopicId"], 777)
+            with patch.object(driver, "resolve_sut", return_value={"id": "99", "username": "another_bot"}):
+                with self.assertRaisesRegex(driver.DriverError, "different identity"):
+                    driver.cleanup_dm_topic(instance, manifest)
+            self.assertEqual(mode.call_count, 1, "foreign cleanup must not change BotFather settings")
+            restored = driver.cleanup_dm_topic(instance, manifest)
+            self.assertEqual(restored["status"], "restored")
+            self.assertFalse(restored["threadedMode"]["after"])
+            driver.cleanup_dm_topic(instance, manifest)
+            self.assertEqual([call.args[2] for call in mode.call_args_list], [True, False])
+            deletes = [call.args[0] for call in instance.client.request.call_args_list
+                       if call.args[0]["@type"] == "deleteForumTopic"]
+            self.assertEqual(deletes, [{"@type": "deleteForumTopic", "chat_id": 42, "forum_topic_id": 777}])
+
+    def test_delete_failure_still_disables_mode_without_claiming_cleanup(self):
+        instance = self.instance(fail_delete=True)
+        mode = Mock(side_effect=lambda _driver, _identity, enabled: {"before": not enabled, "after": enabled})
+        with tempfile.TemporaryDirectory() as root, \
+             patch.object(driver, "resolve_sut", return_value={"id": "42", "username": "leased_bot"}), \
+             patch.object(driver, "set_bot_threaded_mode", mode):
+            manifest = Path(root) / "dm-topic.json"
+            driver.prepare_dm_topic(instance, manifest)
+            with self.assertRaisesRegex(driver.DriverError, "Deletion denied"):
+                driver.cleanup_dm_topic(instance, manifest)
+            self.assertFalse(mode.call_args.args[2])
+            self.assertEqual(driver.read_json(manifest)["status"], "mode-disabled")
+            self.assertFalse(driver.read_json(manifest)["ok"])
+
+    def test_retrying_mode_restoration_does_not_repeat_a_confirmed_deletion(self):
+        instance = self.instance()
+        mode = Mock(side_effect=[
+            {"before": False, "after": True},
+            driver.DriverError("Browser unavailable"),
+            {"before": True, "after": False},
+        ])
+        with tempfile.TemporaryDirectory() as root, \
+             patch.object(driver, "resolve_sut", return_value={"id": "42", "username": "leased_bot"}), \
+             patch.object(driver, "set_bot_threaded_mode", mode):
+            manifest = Path(root) / "dm-topic.json"
+            driver.prepare_dm_topic(instance, manifest)
+            with self.assertRaisesRegex(driver.DriverError, "Browser unavailable"):
+                driver.cleanup_dm_topic(instance, manifest)
+            self.assertTrue(driver.read_json(manifest)["topicDeleted"])
+            self.assertEqual(driver.cleanup_dm_topic(instance, manifest)["status"], "restored")
+            deletes = [call for call in instance.client.request.call_args_list
+                       if call.args[0]["@type"] == "deleteForumTopic"]
+            self.assertEqual(len(deletes), 1)
+
+    def test_uncertain_creation_reconciles_only_its_recorded_topic(self):
+        instance = self.instance(fail_create=True)
+        mode = Mock(side_effect=lambda _driver, _identity, enabled: {"before": not enabled, "after": enabled})
+        with tempfile.TemporaryDirectory() as root, \
+             patch.object(driver, "resolve_sut", return_value={"id": "42", "username": "leased_bot"}), \
+             patch.object(driver, "set_bot_threaded_mode", mode):
+            manifest = Path(root) / "dm-topic.json"
+            with self.assertRaisesRegex(driver.DriverError, "Timed out"):
+                driver.prepare_dm_topic(instance, manifest)
+            title = driver.read_json(manifest)["topicTitle"]
+            self.assertEqual(driver.cleanup_dm_topic(instance, manifest)["status"], "restored")
+            listed = [call.args[0] for call in instance.client.request.call_args_list
+                      if call.args[0]["@type"] == "getForumTopics"]
+            self.assertEqual(listed[0]["query"], title)
+
+
 class AuthorizationTest(unittest.TestCase):
     def test_registers_a_new_test_user_with_explicit_names(self):
         class Client:
