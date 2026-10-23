@@ -223,7 +223,10 @@ export async function settleStalePackageActivation(
 }
 
 /** Explicit repair retires untouched preparation or a verified externally published candidate. */
-export async function settlePendingPackageActivation(installKey: string) {
+export async function settlePendingPackageActivation(
+  installKey: string,
+  options?: { automatic?: boolean; dryRun?: boolean },
+) {
   const anchor = resolvePackageActivationAnchor(installKey);
   if (!fs.lstatSync(resolvePackageActivationJournalPath(anchor), { throwIfNoEntry: false })) {
     readPackageActivationContinuation(installKey);
@@ -245,6 +248,9 @@ export async function settlePendingPackageActivation(installKey: string) {
     liveIdentity === initial.descriptor.candidate.identity &&
     initial.phase === "prepared";
   if (!publicationNotStarted && !externalPublication) {
+    if (options?.automatic) {
+      return undefined;
+    }
     // Preserve the shipped pending-publication refusal and completed-operation behavior.
     assertNoPendingPackageActivation(installKey);
     return undefined;
@@ -264,6 +270,15 @@ export async function settlePendingPackageActivation(installKey: string) {
     initial,
     admission.assertUnchanged,
   ).preflight(initial.phase === "prepared" ? "repair" : "retire");
+  const settlement = {
+    operationId: initial.descriptor.operationId,
+    reason: externalPublication
+      ? ("publication-settled-external-change" as const)
+      : ("publication-not-started" as const),
+  };
+  if (options?.dryRun) {
+    return settlement;
+  }
   return withUpdateCommandExecutor(
     randomUUID(),
     async (executor) => {
@@ -287,12 +302,7 @@ export async function settlePendingPackageActivation(installKey: string) {
         await owner.disarmRollback();
       }
       await owner.retire();
-      return {
-        operationId: initial.descriptor.operationId,
-        reason: externalPublication
-          ? "publication-settled-external-change"
-          : "publication-not-started",
-      };
+      return settlement;
     },
     { existingAuthority: initial.descriptor.authority },
   );
