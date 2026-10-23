@@ -119,6 +119,11 @@ export function createSessionsArchive(host: SessionPageArchiveHost) {
         ) {
           return;
         }
+        scope.context.navigation.update({
+          sidebarEntries: scope.context.navigation.snapshot.sidebarEntries.filter(
+            (entry) => entry !== "session:" + key,
+          ),
+        });
         showToast({
           message: t("sessionsView.sessionArchived"),
           actionLabel: t("common.undo"),
