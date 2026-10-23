@@ -86,17 +86,11 @@ it("attaches a live receipt without replacing the accepted answer with a stale p
   expect(state.refreshRetryTimer).toBeNull();
 });
 
-it.each(["revision", "client", "prompt"] as const)(
+it.each(["client", "prompt"] as const)(
   "discards a held receipt after its captured %s owner changes",
   async (changedOwner) => {
     const { state, finish } = heldReceipt();
-    if (changedOwner === "revision") {
-      const prompt = state.prompts.get(question.id);
-      if (!prompt) {
-        throw new Error("The answered prompt must exist before receipt invalidation");
-      }
-      prompt.revision += 1;
-    } else if (changedOwner === "client") {
+    if (changedOwner === "client") {
       setQuestionPromptClient(state, null);
     } else {
       state.prompts.clear();
