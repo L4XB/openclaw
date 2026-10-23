@@ -580,12 +580,14 @@ function createMetricsHandler(store: PrometheusMetricStore): OpenClawPluginHttpR
     res.statusCode = 200;
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-    res.setHeader("Content-Length", String(Buffer.byteLength(body)));
-    if (req.method === "HEAD") {
-      res.end();
-      return true;
-    }
-    res.end(body);
+    res.setHeader("Content-Length", String(body.length));
+    res.flushHeaders();
+    res.end(req.method === "HEAD" ? undefined : body, (error?: Error | null) => {
+      // Only the completed response owns this backing store; prefixes stay in the metric store.
+      if (!error) {
+        body.buffer.transfer(0);
+      }
+    });
     return true;
   };
 }
@@ -602,7 +604,12 @@ type TrustedExporterDiagnosticsBridge = {
 };
 
 export function createDiagnosticsPrometheusExporter() {
-  const store = createPrometheusMetricStore();
+  let logger: OpenClawPluginServiceContext["logger"] | undefined;
+  const store = createPrometheusMetricStore((family) => {
+    logger?.warn(
+      `diagnostics-prometheus: series budget reached for ${family}; new label sets are being dropped. See openclaw_prometheus_family_series_dropped_total.`,
+    );
+  });
   let unsubscribe: (() => void) | undefined;
   let unsubscribeWork: (() => void) | undefined;
   let internalDiagnostics: TrustedExporterDiagnosticsBridge | undefined;
@@ -628,6 +635,7 @@ export function createDiagnosticsPrometheusExporter() {
         ctx.logger.error("diagnostics-prometheus: internal diagnostics capability unavailable");
         return;
       }
+      logger = ctx.logger;
       reserveMainGcHistograms(store);
       const identity = isDiagnosticsEnabled(ctx.config)
         ? ctx.internalDiagnostics?.getRuntimeIdentity?.()
@@ -681,6 +689,7 @@ export function createDiagnosticsPrometheusExporter() {
       });
       internalDiagnostics = undefined;
       store.reset();
+      logger = undefined;
     },
   } satisfies OpenClawPluginService;
 

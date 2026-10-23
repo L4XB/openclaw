@@ -1,5 +1,14 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
+import {
+  createSignal,
+  createUniqueId,
+  For,
+  isPending,
+  latest,
+  Loading,
+  onSettled,
+  Show,
+} from "solid-js";
 import { SESSION_VISIBILITY_VALUES } from "../../../../../packages/gateway-protocol/src/schema/sessions-sharing-constants.js";
 import type { SessionMemberPermissionLevel } from "../../../../../packages/gateway-protocol/src/schema/sessions-sharing.js";
 import type { SessionVisibility } from "../../../api/types.ts";
@@ -19,6 +28,7 @@ import { registerEnglishCatalog, t } from "../../../lib/reactive/i18n.ts";
 import "../../../styles/settings.css";
 import "../../../styles/chat/sharing-mobile.css";
 import {
+  ChatSessionSharingError,
   chatSessionPermissionLabel,
   type ChatSessionSharingRosterRow,
 } from "./chat-session-sharing-shared.tsx";
@@ -48,6 +58,8 @@ export type ChatSessionSharingMobileProps = {
   accessDisabledReason?: string;
   onOpenAccess: () => void;
   error?: string;
+  completion?: Promise<void>;
+  pending?: boolean;
   publicLink?: {
     enabled: boolean;
     description: string;
@@ -62,6 +74,8 @@ export type ChatSessionSharingMobileProps = {
   permissions?: {
     rows: readonly ChatSessionSharingRosterRow[];
     loading: boolean;
+    read: () => void;
+    scope: () => unknown;
     personActivity?: PersonActivityRouting;
     onPermissionChange: (identityId: string, level: SessionMemberPermissionLevel) => void;
   };
@@ -75,6 +89,7 @@ export type ChatSessionAccessMobileProps = {
   pending: boolean;
   disabledReason?: string;
   error?: string;
+  completion?: Promise<void>;
   /** True only after an applied mutation still belonging to this current destination. */
   onVisibilityChange: (visibility: SessionVisibility) => Promise<boolean>;
   onApplied: () => void;
@@ -166,11 +181,17 @@ export function ChatSessionSharingMobile(props: ChatSessionSharingMobileProps) {
           </section>
         )}
       </Show>
-      <Show when={props.error}>
-        <p class="chat-sharing-mobile__error" role="alert">
-          {props.error}
-        </p>
-      </Show>
+      <ChatSessionSharingError
+        error={props.error}
+        completion={props.completion}
+        pending={props.pending}
+      >
+        {(error) => (
+          <p class="chat-sharing-mobile__error" role="alert">
+            {error}
+          </p>
+        )}
+      </ChatSessionSharingError>
       <Show when={props.permissions}>
         {(permissions) => <SharingPermissions data={permissions()} labels={props.labels} />}
       </Show>
@@ -251,12 +272,14 @@ function SharingPermissions(props: {
           />
         </div>
       </SharingDisclosure>
-      <div class="chat-sharing-mobile__group" aria-busy={props.data.loading ? "true" : "false"}>
-        <Show
-          when={!props.data.loading || props.data.rows.length > 0}
-          fallback={
-            <PanelLoadingSkeleton variant="file-list" label={t("common.loading")} compact />
-          }
+      <Loading
+        on={props.data.scope()}
+        fallback={<PanelLoadingSkeleton variant="file-list" label={t("common.loading")} compact />}
+      >
+        {(latest(props.data.read), null)}
+        <div
+          class="chat-sharing-mobile__group"
+          aria-busy={isPending(props.data.read) || props.data.loading ? "true" : "false"}
         >
           <For each={matches()} keyed={(row) => row.identity.id}>
             {(row) => <SharingPermissionRow row={row()} data={props.data} />}
@@ -266,8 +289,8 @@ function SharingPermissions(props: {
               {t(query().trim() ? "sessionsView.noPeopleMatch" : "chat.sessionSharing.noPeople")}
             </p>
           </Show>
-        </Show>
-      </div>
+        </div>
+      </Loading>
     </section>
   );
 }
@@ -392,11 +415,17 @@ export function ChatSessionAccessMobile(props: ChatSessionAccessMobileProps) {
           )}
         </For>
       </div>
-      <Show when={props.error}>
-        <p class="chat-sharing-mobile__error" role="alert">
-          {props.error}
-        </p>
-      </Show>
+      <ChatSessionSharingError
+        error={props.error}
+        completion={props.completion}
+        pending={props.pending}
+      >
+        {(error) => (
+          <p class="chat-sharing-mobile__error" role="alert">
+            {error}
+          </p>
+        )}
+      </ChatSessionSharingError>
     </div>
   );
 }

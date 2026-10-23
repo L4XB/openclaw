@@ -672,6 +672,7 @@ export {
   WorktreesRestoreParamsSchema,
   WorktreesGcParamsSchema,
   WorktreesGcResultSchema,
+  WorktreesRecoverFileParamsSchema,
   WorktreesRecoverRemovalParamsSchema,
   WorktreesRecoverRemovalResultSchema,
   WorktreesRetireSnapshotParamsSchema,
