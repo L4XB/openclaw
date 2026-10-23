@@ -44,6 +44,27 @@ export function registerVerifiedActivationFailureTests({
     });
   });
 
+  it("keeps a verified activation successful when terminal recording fails", async () => {
+    mocks.restartService.mockImplementationOnce(async ({ onVerified }) => {
+      onVerified?.(Date.now());
+      throw new Error("terminal ledger write denied");
+    });
+    const rollback = vi.spyOn(rollbackModule, "rollbackFailedUpdate");
+    await finishSuccessfulPackageSwitch();
+    expect(rollback).not.toHaveBeenCalled();
+    expect(mocks.printResult.mock.lastCall?.[0]).toMatchObject({
+      status: "ok",
+      steps: expect.arrayContaining([
+        expect.objectContaining({
+          advisory: {
+            kind: "recoverable-maintenance",
+            message: expect.stringContaining("terminal ledger write denied"),
+          },
+        }),
+      ]),
+    });
+  });
+
   it.each([
     { name: "retires the wrapper before persisting and printing success", denied: false },
     {

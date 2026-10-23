@@ -9,7 +9,6 @@ import { AgentDatabaseAdmissionRefusalSchema } from "../../packages/gateway-prot
 import { createTempDirTracker } from "../../test/helpers/temp-dir.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { requireNodeSqlite } from "../infra/node-sqlite.js";
-import { revokeSqliteDatabaseAdmissionsForPath } from "../infra/sqlite-database-admission.js";
 import {
   findStartupMaintenanceRequiredError,
   StartupMaintenanceRequiredError,
@@ -28,6 +27,7 @@ import { withAgentDatabaseStartupAdmission } from "./agent-database-startup.js";
 import { readAgentDeletionJournalStatusInDatabase } from "./agent-deletion-journal.read.js";
 import { OPENCLAW_AGENT_SCHEMA_VERSION } from "./openclaw-agent-db-contract.js";
 import {
+  closeOpenClawAgentDatabasesAsync,
   closeOpenClawAgentDatabasesForTest,
   openOpenClawAgentDatabase,
 } from "./openclaw-agent-db.js";
@@ -86,7 +86,6 @@ describe("agent database admission", () => {
       await closeOpenClawAgentDatabasesAsync();
       closeOpenClawStateDatabaseForTest();
       for (const pathname of [workerPath, retainedPath]) {
-        revokeSqliteDatabaseAdmissionsForPath(pathname);
         const database = new (requireNodeSqlite().DatabaseSync)(pathname);
         try {
           database.exec(`PRAGMA journal_mode=DELETE; PRAGMA user_version=${version};`);

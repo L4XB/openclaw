@@ -23,7 +23,6 @@ import {
   resolveAutomaticUpdateTriage,
   UpdateCommandFailure,
 } from "./update-command-result.js";
-import { GatewayRestartHealthError } from "./update-command-service-command.js";
 import { withOwnedManagedUpdateEnv } from "./update-command-service-env.js";
 import type { UpdateCommandTerminalRecord } from "./update-command-terminal-record.js";
 import {
@@ -229,13 +228,6 @@ export function createPostUpdateFailureResult(
   const failureFacts = collectUpdateDoctorFailureFacts(error);
   if (
     activationVerified &&
-    collectNestedErrorCandidates(error).every(
-      (cause) =>
-        cause instanceof GatewayRestartHealthError ||
-        (cause instanceof UpdateCommandFailure &&
-          cause.result.reason === "wrapper-retirement-failed" &&
-          cause.result.recovery?.serviceRestartSafe !== false),
-    ) &&
     error instanceof Error &&
     params.result.recovery?.serviceRestartSafe !== false
   ) {
