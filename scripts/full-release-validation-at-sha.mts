@@ -786,6 +786,98 @@ function resolveTrustedWorkflowSha(requestedSha: string, trustedWorkflowRef: str
   return workflowSha;
 }
 
+export function formatCandidateToolingLagWarning(
+  candidateSha: string,
+  mainSha: string,
+  commitCount: number,
+  changedPathCount: number,
+  changedAreas: string[],
+) {
+  return [
+    `WARNING: candidate-owned Q=C tooling ${candidateSha} is ${commitCount} non-merge commit(s) behind main ${mainSha}, with ${changedPathCount} net changed path(s). Main cannot repair this candidate harness; review and port applicable release fixes before dispatch.`,
+    ...(changedAreas.length > 0
+      ? ["Largest changed areas (share of net changed paths):", ...changedAreas]
+      : []),
+    `Inspect every exact path: git diff --name-status ${candidateSha} ${mainSha}`,
+  ].join("\n");
+}
+
+function warnCandidateToolingLag(candidateSha: string) {
+  const fetch = runStatus(
+    "git",
+    ["fetch", "--no-tags", "origin", "refs/heads/main:refs/remotes/origin/main"],
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+  if (fetch.status !== 0) {
+    console.warn(
+      "WARNING: candidate tooling lag is unavailable because origin/main could not be refreshed; continuing with the existing qualification checks.",
+    );
+    return;
+  }
+  const mainSha = resolveSha("origin/main");
+  if (candidateSha === mainSha) {
+    return;
+  }
+  const commitCount = Number(
+    run("git", [
+      "rev-list",
+      "--count",
+      "--right-only",
+      "--no-merges",
+      `${candidateSha}...${mainSha}`,
+    ]),
+  );
+  const changedPaths = run("git", ["diff", "--no-renames", "--name-only", candidateSha, mainSha])
+    .split(/\r?\n/u)
+    .filter(Boolean);
+  if (commitCount > 0 && changedPaths.length > 0) {
+    const changedAreas = run("git", [
+      "diff",
+      "--no-renames",
+      "--dirstat=files,1",
+      candidateSha,
+      mainSha,
+    ])
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    console.warn(
+      formatCandidateToolingLagWarning(
+        candidateSha,
+        mainSha,
+        commitCount,
+        changedPaths.length,
+        changedAreas,
+      ),
+    );
+  }
+}
+
+function assertAdmissionContract(admissionWorkflowSha: string) {
+  const workflow = parseYaml(
+    run("git", ["show", `${admissionWorkflowSha}:.github/workflows/${ADMISSION_WORKFLOW}`]),
+  );
+  requireDispatch(
+    workflow?.env?.RELEASE_QUALIFICATION_ADMISSION_CONTRACT === "1",
+    "Selected P lacks qualification admission; update P independently without changing C/Q",
+  );
+}
+
+// Main routinely advances between P selection and the admission POST. A newer
+// tip replaces P only when it is trusted main, descends from the selected P,
+// and still declares the admission contract.
+function verifyMainAdmissionAdvance(previousSha: string, currentSha: string) {
+  requireDispatch(
+    resolveTrustedWorkflowSha(currentSha, "main") === currentSha,
+    `Main tip ${currentSha} did not resolve to itself`,
+  );
+  requireDispatch(
+    runStatus("git", ["merge-base", "--is-ancestor", previousSha, currentSha]).status === 0,
+    `Main tip ${currentSha} does not descend from selected P ${previousSha}`,
+  );
+  assertAdmissionContract(currentSha);
+}
+
 function requireDispatch(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
@@ -1878,6 +1970,7 @@ async function main() {
     );
   }
   if (candidateOwned) {
+    warnCandidateToolingLag(workflowSha);
     const baselinePolicy: unknown = JSON.parse(
       run("git", ["show", `${workflowSha}:scripts/lib/upgrade-survivor-scenarios.json`]),
     );
