@@ -84,6 +84,12 @@ function fixture(response?: Response) {
   };
   return { provider, context, probe, fetch };
 }
+function conversionFixture(response: Response) {
+  // These cases prove deterministic conversion, not cold request-policy latency.
+  // Keep the same finite budget; deadline cases below advance their own clock.
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
+  return fixture(response);
+}
 function sentRequest(fetch: ReturnType<typeof fixture>["fetch"]) {
   expect(fetch).toHaveBeenCalledOnce();
   const call = fetch.mock.calls[0];
@@ -147,7 +153,7 @@ it("registers a decision-only agent-scoped provider with standard credential set
   expect(fetch).not.toHaveBeenCalled();
 });
 it("accepts current native usage and reasoning without double-counting tokens or inventing cost", async () => {
-  const { provider, context, fetch } = fixture(Response.json(reported));
+  const { provider, context, fetch } = conversionFixture(Response.json(reported));
   const outcome = await provider.evaluate(batch, { ...context, reasoning: "off" });
   assert(outcome.status === "ok");
   expect(outcome.result).toMatchObject({
@@ -188,9 +194,6 @@ it("preserves prepared URL prefixes and private effective headers, without crede
   });
 });
 it("uses one native batch for mixed scalar kinds and retains partial failures and metadata", async () => {
-  // Batch conversion is not a latency test. Keep its caller deadline deterministic;
-  // the deadline/abort scenarios below explicitly advance their own clocks.
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date", "performance"] });
   const tags = [
     { id: "a", applies: null, probability: 0.51 },
     { id: "b", applies: true, probability: 0.99 },
@@ -239,7 +242,7 @@ it("uses one native batch for mixed scalar kinds and retains partial failures an
       latency_ms: 30,
     },
   };
-  const { provider, context, fetch } = fixture(Response.json(native));
+  const { provider, context, fetch } = conversionFixture(Response.json(native));
   const outcome = await provider.evaluate(input, context);
   assert(outcome.status === "ok", JSON.stringify(outcome));
   expect(validateDecisionResultV2(input, outcome.result)).toBe(true);
@@ -271,7 +274,7 @@ it.each([2, 26])("preserves a %i-level rubric and distribution", async (count) =
     level,
     probability: level === count - 1 ? 1 : 0,
   }));
-  const { provider, context, fetch } = fixture(
+  const { provider, context, fetch } = conversionFixture(
     Response.json(
       nativeReply("score", "scale", {
         expectation: count - 1,
@@ -317,7 +320,7 @@ it("preserves native sort without pairwise fan-out", async () => {
     questions: { rank: { type: "sort", instructions: "Urgency" } },
   };
   const native = nativeReply("rank", "sort", { sorted: ["b", "a"], confidence: null });
-  const { provider, context, fetch } = fixture(Response.json(native));
+  const { provider, context, fetch } = conversionFixture(Response.json(native));
   await expect(provider.evaluate(input, context)).resolves.toMatchObject({
     status: "ok",
     result: { answers: { rank: { type: "sort", order: ["b", "a"], confidence: null } } },
