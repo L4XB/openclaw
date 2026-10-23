@@ -14,8 +14,6 @@ import { registerUpdateActionsEnglish } from "../i18n/locales/en-update-actions.
 
 registerUpdateActionsEnglish();
 
-type OracleState = "pass" | "warn" | "fail" | "pending";
-
 export function updateRunStepOwner(step: string): string {
   // Diagnostic suffixes identify ledger receipts, not additional installation work.
   return step.replace(/^(?:diagnostic|warning):(.+?)(?::\d+)?$/u, "$1");
@@ -80,7 +78,7 @@ export function projectUpdateRun(run: UpdateRunRecord, connected = true) {
   const details = detailStep ? (stepDetails.get(updateRunStepOwner(detailStep.step)) ?? "") : "";
   const facts = run.verification;
   const identity = resolveUpdateRunIdentity(facts, run.after);
-  const booleanState = (value: boolean | undefined): OracleState =>
+  const booleanState = (value: boolean | undefined): "pass" | "warn" | "fail" | "pending" =>
     value === undefined ? (terminal ? "warn" : "pending") : value ? "pass" : "fail";
   const oracles = [
     { name: "service", state: booleanState(facts.serviceRunning) },
