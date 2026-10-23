@@ -157,6 +157,11 @@ Local Markdown link paths are percent-decoded for lint and generated backlinks:
 `[Target](%74arget.md)` resolves to `target.md`. Malformed percent escapes remain
 literal, and Obsidian wikilinks keep their existing syntax.
 
+Lint also resolves links to files in `_attachments/`: an embed such as
+`![[diagram.png]]` matches the file name, and a link such as
+`[Receipt](../_attachments/receipt.pdf)` matches its path. Links to missing files
+are still reported.
+
 When `render.createDashboards` is enabled, compile also maintains report dashboards under `reports/` for open questions, contradictions, low-confidence pages, and stale pages.
 
 Unmanaged raw Markdown can live under `sources/` without OpenClaw page frontmatter. Add `<!-- openclaw:wiki:raw-source -->` near the top of the page body to opt it out of wiki page metadata and freshness lint; generated or source-sync tracked imports still require their structured metadata.

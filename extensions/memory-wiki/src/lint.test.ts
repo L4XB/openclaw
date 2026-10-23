@@ -202,6 +202,28 @@ describe("lintMemoryWikiVault", () => {
     }
   });
 
+  it("resolves links to files in the attachments folder", async () => {
+    const { config, page, write } = await createLintVault();
+    await write("_attachments/diagram.png", Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    await write("_attachments/scans/receipt 2026.pdf", "%PDF-1.7\n");
+    await page(
+      "sources/links.md",
+      { pageType: "source", id: "source.links", title: "Links" },
+      "# Links\n\n![[diagram.png]]\n" +
+        "![Diagram](../_attachments/diagram.png)\n" +
+        "[Receipt](../_attachments/scans/receipt%202026.pdf)\n" +
+        "![[missing.png]]\n",
+    );
+
+    const result = await lintMemoryWikiVault(config);
+
+    expect(
+      result.issues
+        .filter((issue) => issue.code === "broken-wikilink")
+        .map((issue) => issue.message),
+    ).toEqual(["Broken wikilink target `missing.png`."]);
+  });
+
   it("resolves percent-encoded link destinations for lint and generated backlinks", async () => {
     const { config, page, rootDir } = await createLintVault();
     await page("entities/plan notes.md", {

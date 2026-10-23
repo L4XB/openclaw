@@ -7,6 +7,7 @@ import {
 } from "openclaw/plugin-sdk/memory-host-markdown";
 import { replaceFileAtomic } from "openclaw/plugin-sdk/security-runtime";
 import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/string-coerce-runtime";
+import { walkMemoryWikiDirectory } from "./bounded-walk.js";
 import {
   assessPageFreshness,
   buildClaimContradictionClusters,
@@ -106,11 +107,18 @@ function addPathSuffixTargets(index: WikiLinkTargetIndex, raw: string | undefine
   }
 }
 
-function buildWikiLinkTargetIndex(pages: WikiPageSummary[]): WikiLinkTargetIndex {
+function buildWikiLinkTargetIndex(
+  pages: WikiPageSummary[],
+  attachmentPaths: readonly string[],
+): WikiLinkTargetIndex {
   const index: WikiLinkTargetIndex = {
     pathTargets: new Set(),
     aliasTargets: new Set(),
   };
+  for (const attachmentPath of attachmentPaths) {
+    // Embeds name an attachment by file name (`![[diagram.png]]`), Markdown links by its path.
+    addPathTarget(index, attachmentPath);
+  }
   for (const page of pages) {
     addPathTarget(index, page.relativePath);
     const title = normalizeLowercaseStringOrEmpty(normalizeLintTarget(page.title, false));
@@ -149,6 +157,7 @@ function hasValidWikiLinkTarget(index: WikiLinkTargetIndex, rawTarget: string): 
 function collectPageIssues(
   pages: WikiPageSummary[],
   managedImportedSourcePagePaths: Set<string>,
+  attachmentPaths: readonly string[],
 ): MemoryWikiLintIssue[] {
   const issues: MemoryWikiLintIssue[] = [];
   const addIssue = (...args: Parameters<typeof createLintIssue>) => {
@@ -298,7 +307,7 @@ function collectPageIssues(
     }
   }
 
-  const validTargets = buildWikiLinkTargetIndex(pages);
+  const validTargets = buildWikiLinkTargetIndex(pages, attachmentPaths);
   for (const page of pages) {
     for (const linkTarget of page.linkTargets) {
       if (!hasValidWikiLinkTarget(validTargets, linkTarget)) {
@@ -408,6 +417,9 @@ export async function lintMemoryWikiVault(
   const managedImportedSourcePagePaths = new Set(
     Object.values(sourceSyncState.entries).map((entry) => entry.pagePath.split(path.sep).join("/")),
   );
+  const attachmentPaths = (await walkMemoryWikiDirectory(config.vault.path, "_attachments"))
+    .filter((entry) => entry.kind === "file")
+    .map((entry) => entry.relativePath.split(path.sep).join("/"));
   const issues = [
     ...compileResult.frontmatterErrors.map((error) =>
       createLintIssue(
@@ -416,7 +428,7 @@ export async function lintMemoryWikiVault(
         `Frontmatter failed to parse: ${error.message}`,
       ),
     ),
-    ...collectPageIssues(compileResult.pages, managedImportedSourcePagePaths),
+    ...collectPageIssues(compileResult.pages, managedImportedSourcePagePaths, attachmentPaths),
   ].toSorted((left, right) => left.path.localeCompare(right.path));
   const issuesByCategory = buildIssuesByCategory(issues);
   const reportPath = await writeLintReport(config.vault.path, issues);
