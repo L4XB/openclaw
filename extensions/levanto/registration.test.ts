@@ -281,7 +281,17 @@ it.each([2, 26])("preserves a %i-level rubric and distribution", async (count) =
     ),
   );
   const outcome = await provider.evaluate(input, context);
-  assert(outcome.status === "ok");
+  assert(
+    outcome.status === "ok",
+    outcome.status === "ok"
+      ? ""
+      : JSON.stringify({
+          status: outcome.status,
+          reason: outcome.reason,
+          fetchCount: fetch.mock.calls.length,
+          deadlineRemainingMs: context.deadlineMonotonicMs - performance.now(),
+        }),
+  );
   expect(outcome.result.answers).toMatchObject({
     score: {
       type: "score",
