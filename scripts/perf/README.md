@@ -121,7 +121,8 @@ and cleanup.
 `session-catalog-selection-measure.ts` invokes the real `sessions.catalog.list`
 handler with a real row projection over 5,000 persisted synthetic sessions split
 between two agents. Two synthetic providers consume the shared planning snapshot
-and return 16 rows each. Every measured call follows a committed metadata update;
+and return 16 rows each. Every measured call follows a committed metadata update
+and waits for the row owner to settle before reading its order;
 `--unchanged` instead measures repeated calls at one revision. This is in-process
 handler evidence, without transport, model calls, or external provider IO.
 
@@ -137,8 +138,8 @@ and warmup precede `CATALOG_READY`; use preparation CPUs until that marker, then
 the pair's interleaved measurement CPUs. Hold one quiet lock and use the shared
 production guard; swap placements in the second pair. Add `--allocations` for a
 separate paired allocation pass including objects collected by minor and major GC.
-Handler latency excludes the metadata write; allocation, GC, promotion, CPU, and
-elapsed time include the write, response hashing, and the one-millisecond pacing
+Handler latency excludes the metadata write and row settling; allocation, GC, promotion, CPU, and
+elapsed time include the write, settling, response hashing, and the one-millisecond pacing
 yield. Selection and catalog allocation subtrees are reported separately.
 
 Compare the initial/final full ordered entry hashes and complete response-sequence

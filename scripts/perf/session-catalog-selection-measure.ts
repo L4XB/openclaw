@@ -336,6 +336,7 @@ try {
         entryFor(agentId, rowIndex, index + 1),
       );
     }
+    await projection.ensureMaterialized();
     const started = performance.now();
     const result = await list();
     latency.push(performance.now() - started);
@@ -384,7 +385,7 @@ try {
       "in-process real sessions.catalog.list handler with persisted synthetic session rows; no transport or model latency claim",
     workload: values.unchanged ? "unchanged-warm-list" : "metadata-update-and-list",
     measurementScope:
-      "Handler latency excludes the metadata write; allocation, GC, CPU and elapsed include the write, response digest and pacing.",
+      "Handler latency excludes the metadata write and row settling; allocation, GC, CPU and elapsed include the write, settling, response digest and pacing.",
     node: process.version,
     sessionCount,
     agents: agents.length,
