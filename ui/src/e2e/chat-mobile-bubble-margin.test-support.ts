@@ -72,7 +72,7 @@ const caseFor = (id: string, role: string, content: unknown, selector = ".chat-b
 const activity = (id: string, key: string, content: unknown = longText) =>
   surface(id, forwarded(key, content), "left", ".chat-session-activity");
 const cardSelector = ".chat-assistant-attachment-card";
-const remoteImage = "https://media.example/preview.png";
+const remoteImage = (width = 960) => `https://media.example/preview-${width}.png`;
 
 export const marginCases = [
   caseFor("user-long", "user", longText),
@@ -103,8 +103,11 @@ export const marginCases = [
         "assistant",
         [
           attachment
-            ? mediaAttachment("image", "sample.png", "image/png", remoteImage, { width, height })
-            : { type: "image", url: remoteImage, width, height },
+            ? mediaAttachment("image", "sample.png", "image/png", remoteImage(width), {
+                width,
+                height,
+              })
+            : { type: "image", url: remoteImage(width), width, height },
         ],
         ".chat-message-image",
       ),
@@ -129,7 +132,7 @@ export const marginCases = [
   ].map(([id, key]) => activity(id!, key!)),
   activity("forwarded-short", "agent:main:cron:release-review", "Review complete."),
   activity("forwarded-media", "agent:research:notes", [
-    { ...image, url: remoteImage },
+    { ...image, url: remoteImage() },
     file,
     { type: "text", text: "The sample checklist is ready." },
   ]),
@@ -206,9 +209,10 @@ export async function resizeMarginViewport(page: Page, width: number): Promise<v
 }
 
 export async function measureMargin(page: Page, testCase: MarginCase) {
-  const target = page.locator(`.chat-thread ${testCase.selector}`).first();
+  const scope = page.locator(".chat-pane-cache__pane--active");
+  const target = scope.locator(`.chat-thread ${testCase.selector}`).first();
   await target.waitFor();
-  await page
+  await scope
     .locator(".chat-thread img.chat-message-image")
     .evaluateAll((images: HTMLImageElement[]) =>
       Promise.all(images.map((element) => element.decode())),
