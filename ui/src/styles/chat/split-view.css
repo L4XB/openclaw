@@ -1124,7 +1124,7 @@
   cursor: default;
 }
 
-.chat-pane__sharing-menu--desktop .chat-pane__sharing-person:hover:not(:disabled) {
+.chat-pane__sharing-menu--desktop .chat-pane__sharing-person:hover {
   background: var(--bg-hover);
 }
 

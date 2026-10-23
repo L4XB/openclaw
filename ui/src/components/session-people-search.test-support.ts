@@ -1,5 +1,6 @@
 import { createComponent } from "solid-js";
 import { vi } from "vitest";
+import type { SessionMemberPermission } from "../../../packages/gateway-protocol/src/schema/sessions-sharing.js";
 import type { ChatSessionSharingProps } from "../pages/chat/components/chat-session-sharing-shared.tsx";
 import { ChatSessionSharing } from "../pages/chat/components/chat-session-sharing.solid.tsx";
 import { mountSolid } from "../test-helpers/mount-solid.ts";
@@ -19,9 +20,9 @@ export function mountPeopleSharing(
           sessionKey: key,
           role: "owner",
           allowedVisibilities: ["read-only"],
-          permissions: Array.from({ length: count }, (_, i) => ({
+          permissions: Array.from({ length: count }, (_, i): SessionMemberPermission => ({
             identityId: `person-${i}`,
-            level: memberIds.includes(`person-${i}`) ? ("send" as const) : ("read" as const),
+            level: memberIds.includes(`person-${i}`) ? "send" : "read",
             options: ["read", "send"],
           })),
           members: memberIds.map((identityId) => ({ identityId, addedBy: "owner", addedAt: 1 })),
