@@ -1450,7 +1450,7 @@ def set_bot_threaded_mode(driver, identity, enabled):
         result = subprocess.run(
             ["node", str(Path(__file__).with_name("botfather-threaded-mode.mjs")),
              str(url_path), identity["sutUsername"], "on" if enabled else "off"],
-            capture_output=True, text=True, timeout=150,
+            capture_output=True, text=True,
         )
         if result.returncode != 0:
             raise DriverError("BotFather Threaded Mode action failed.")
@@ -1458,7 +1458,7 @@ def set_bot_threaded_mode(driver, identity, enabled):
         if state.get("after") is not enabled:
             raise DriverError("BotFather Threaded Mode was not confirmed.")
         return state
-    except (subprocess.TimeoutExpired, ValueError):
+    except ValueError:
         raise DriverError("BotFather Threaded Mode action failed.") from None
     finally:
         if url_path is not None:
@@ -1502,10 +1502,15 @@ def cleanup_dm_topic(driver, manifest_path):
         raise DriverError("DM topic cleanup record belongs to a different identity.")
     if record.get("status") == "restored":
         return public_dm_topic_record(record)
+    resuming = record.get("status") in {"restoring", "mode-disabled"}
     record.update(ok=False, status="restoring")
     write_json_private(manifest_path, record)
     try:
         if record.get("chatId") and not record.get("topicDeleted"):
+            if resuming:
+                # A previous cleanup can have disabled topics before its deletion was confirmed.
+                record["threadedMode"] = set_bot_threaded_mode(driver, identity, True)
+                write_json_private(manifest_path, record)
             topic_id = record.get("forumTopicId")
             if topic_id is None:
                 listed = driver.client.request({

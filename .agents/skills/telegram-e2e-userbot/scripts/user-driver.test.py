@@ -115,9 +115,27 @@ class DmTopicTest(unittest.TestCase):
                        if call.args[0]["@type"] == "deleteForumTopic"]
             self.assertEqual(deletes, [{"@type": "deleteForumTopic", "chat_id": 42, "forum_topic_id": 777}])
 
-    def test_delete_failure_still_disables_mode_without_claiming_cleanup(self):
-        instance = self.instance(fail_delete=True)
-        mode = Mock(side_effect=lambda _driver, _identity, enabled: {"before": not enabled, "after": enabled})
+    def test_delete_failure_disables_mode_and_recovery_reenables_only_for_pending_deletion(self):
+        instance = self.instance()
+        native_request = instance.client.request.side_effect
+        threaded = False
+        first_delete = True
+        def switch(_driver, _identity, enabled):
+            nonlocal threaded
+            before = threaded
+            threaded = enabled
+            return {"before": before, "after": threaded}
+        def request(payload):
+            nonlocal first_delete
+            if payload["@type"] == "deleteForumTopic":
+                if not threaded:
+                    raise driver.DriverError("Topics disabled")
+                if first_delete:
+                    first_delete = False
+                    raise driver.DriverError("Deletion denied")
+            return native_request(payload)
+        instance.client.request.side_effect = request
+        mode = Mock(side_effect=switch)
         with tempfile.TemporaryDirectory() as root, \
              patch.object(driver, "resolve_sut", return_value={"id": "42", "username": "leased_bot"}), \
              patch.object(driver, "set_bot_threaded_mode", mode):
@@ -125,9 +143,12 @@ class DmTopicTest(unittest.TestCase):
             driver.prepare_dm_topic(instance, manifest)
             with self.assertRaisesRegex(driver.DriverError, "Deletion denied"):
                 driver.cleanup_dm_topic(instance, manifest)
-            self.assertFalse(mode.call_args.args[2])
+            self.assertFalse(threaded)
             self.assertEqual(driver.read_json(manifest)["status"], "mode-disabled")
             self.assertFalse(driver.read_json(manifest)["ok"])
+            self.assertEqual(driver.cleanup_dm_topic(instance, manifest)["status"], "restored")
+            self.assertFalse(threaded)
+            self.assertEqual([call.args[2] for call in mode.call_args_list], [True, False, True, False])
 
     def test_retrying_mode_restoration_does_not_repeat_a_confirmed_deletion(self):
         instance = self.instance()
