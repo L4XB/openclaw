@@ -32,7 +32,6 @@ import {
 } from "./import-runs-state.js";
 import { appendMemoryWikiLog } from "./log.js";
 import {
-  decodeWikiPageUtf8,
   HUMAN_START_MARKER,
   HUMAN_END_MARKER,
   parseWikiMarkdown,
