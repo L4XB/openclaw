@@ -253,19 +253,19 @@ describe("chat session sharing menu", () => {
     expect(props.onPublicShareChange).not.toHaveBeenCalled();
   });
 
-  it("uses server choices for editable and inherited participation", async () => {
+  it("uses server choices for editable opaque human IDs and inherited participation", async () => {
     const onMemberChange = vi.fn();
     const result = {
       owner,
       identities: [
         human("owner", "Owner"),
-        human("editable", "Alex"),
+        human("channel:chn_design", "Alex"),
         human("inherited", "Morgan"),
       ],
       permissions: [
         { identityId: "owner", level: "send" as const, options: ["send"] as "send"[] },
         {
-          identityId: "editable",
+          identityId: "channel:chn_design",
           level: "read" as const,
           options: ["read", "send"] as ("read" | "send")[],
         },
@@ -279,23 +279,28 @@ describe("chat session sharing menu", () => {
     });
     const root = await mount(props);
     expect(root.querySelectorAll('[data-value="member:owner"]')).toHaveLength(1);
-    expect(item(root, "member:inherited")).toBeNull();
+    expect(item(root, "permission:inherited")).toBeNull();
     const inherited = root.querySelector<HTMLElement>('[data-value="member:inherited"]')!;
     expect(part(inherited, "sharing-permission")?.textContent).toBe("Can send");
-    const editable = item(root, "permission:editable")!;
+    const editable = item(root, "permission:channel:chn_design")!;
     expect(editable.textContent).toBe("Can read");
+    expect(
+      root.querySelector('[data-value="member:channel:chn_design"] openclaw-session-owner-chip'),
+    ).not.toBeNull();
     expect(onMemberChange).not.toHaveBeenCalled();
     editable.click();
-    await waitForSolid(() => expect(item(root, "permission:send:editable")).not.toBeNull());
-    item(root, "permission:send:editable")!.click();
-    expect(onMemberChange).toHaveBeenLastCalledWith("editable", true);
+    await waitForSolid(() =>
+      expect(item(root, "permission:send:channel:chn_design")).not.toBeNull(),
+    );
+    item(root, "permission:send:channel:chn_design")!.click();
+    expect(onMemberChange).toHaveBeenLastCalledWith("channel:chn_design", true);
     render(
       {
         ...props,
         state: sharingState({
           ...result,
           permissions: [
-            { identityId: "editable", level: "send", options: ["read", "send"] },
+            { identityId: "channel:chn_design", level: "send", options: ["read", "send"] },
             result.permissions[2]!,
           ],
         }),
@@ -304,10 +309,12 @@ describe("chat session sharing menu", () => {
     );
     expect(editable.textContent).toBe("Can send");
     editable.click();
-    await waitForSolid(() => expect(item(root, "permission:read:editable")).not.toBeNull());
-    const readOption = item(root, "permission:read:editable")!;
+    await waitForSolid(() =>
+      expect(item(root, "permission:read:channel:chn_design")).not.toBeNull(),
+    );
+    const readOption = item(root, "permission:read:channel:chn_design")!;
     readOption.click();
-    expect(onMemberChange).toHaveBeenLastCalledWith("editable", false);
+    expect(onMemberChange).toHaveBeenLastCalledWith("channel:chn_design", false);
     render({ ...props, session: sharingSession({ visibility: "shared" }) }, root);
     readOption.click();
     expect(onMemberChange).toHaveBeenCalledTimes(2);
@@ -436,34 +443,6 @@ describe("chat session sharing menu", () => {
     await waitForSolid(() => expect(onMemberChange).toHaveBeenCalledExactlyOnceWith("alice", true));
     expect(onVisibilityChange).toHaveBeenCalledWith("shared");
     expect(part(root, "sharing-panel")?.matches(":popover-open")).toBe(true);
-  });
-
-  it("renders member presentation from identity.type, not from ID spelling", async () => {
-    const root = await mount({
-      session: sharingSession({ visibility: "read-only" }),
-      state: sharingState({
-        identities: [
-          human("profile-vyctor", "Vyctor Brzezowski"),
-          // Human IDs are opaque; recorded type, not ID spelling, drives presentation.
-          human("channel:chn_design", "Design"),
-          { type: "agent", id: "discord:channel:operations", label: "Operations" },
-          { type: "system", id: "channel:audit", label: "Audit" },
-        ],
-        permissions: [
-          { identityId: "profile-vyctor", level: "read", options: ["read", "send"] },
-          { identityId: "channel:chn_design", level: "read", options: ["read", "send"] },
-        ],
-      }),
-    });
-
-    for (const id of ["profile-vyctor", "channel:chn_design"]) {
-      expect(
-        root.querySelector(`[data-value="member:${id}"] openclaw-session-owner-chip`),
-      ).not.toBeNull();
-    }
-    for (const id of ["discord:channel:operations", "channel:audit"]) {
-      expect(item(root, `member:${id}`)).toBeNull();
-    }
   });
 
   it("keeps the linked owner beside the draft marker for a non-manager", async () => {

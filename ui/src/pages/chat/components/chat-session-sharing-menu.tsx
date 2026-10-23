@@ -270,6 +270,7 @@ export function useChatSessionSharingMenu(
           const identity = () => row().identity;
           const branch: MenuEntry = {
             id: `permission:${identity().id}`,
+            class: "chat-pane__sharing-permission",
             get label() {
               return `${identity().label ?? identity().id}, ${row().controlLabel}`;
             },

@@ -317,7 +317,7 @@ function SharingPermissionRow(props: {
           trigger={
             <>
               <span>{props.row.controlLabel}</span>
-              <Icon name="chevronDown" class="chat-sharing-mobile__check" />
+              <Icon name="chevronDown" class="chat-sharing-mobile__trailing-icon" />
             </>
           }
           items={props.row.options.map((level) => ({

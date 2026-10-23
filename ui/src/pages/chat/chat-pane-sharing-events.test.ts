@@ -17,34 +17,16 @@ import {
 beforeEach(installTranscriptDomMocks);
 afterEach(resetTranscriptTestDom);
 
-it.each([
-  { key: "agent:main:current", agentId: "main" },
-  { key: "global", agentId: "research" },
-])("updates the $key Public badge when another client changes sharing", async (target) => {
-  const row: GatewaySessionRow = {
-    ...target,
-    sessionId: "session-current",
-    kind: "direct",
-    visibility: "draft",
-    sharingRole: "owner",
-  };
-  const evidence = (token?: string): SessionMembersListEvidenceResult => ({
-    sessionKey: row.key,
-    members: [],
-    identities: [],
-    role: "owner",
-    allowedVisibilities: ["shared", "draft"],
-    ...(token ? { publicShare: { token, createdAt: 1 } } : {}),
-  });
+async function mountSharingHeader(
+  row: GatewaySessionRow,
+  read: () => Promise<SessionMembersListEvidenceResult>,
+) {
   const mounted = createMountedPanes([row], row.agentId, undefined, {
     "sessions.list": () => sessionsResult([row], 1),
   });
   const client = mounted.context.gateway.snapshot.client!;
   const originalRequest = client.request.bind(client);
-  let published = false;
-  const sharingRead = vi.fn(async () =>
-    evidence(published ? "synthetic-public-locator" : undefined),
-  );
+  const sharingRead = vi.fn(read);
   const request = vi
     .spyOn(client, "request")
     .mockImplementation(async (method, params, options) =>
@@ -81,6 +63,33 @@ it.each([
     await Promise.all(request.mock.results.map((result) => result.value));
     draw();
   };
+  return { mounted, sharingRead, request, container, draw, settle };
+}
+
+it.each([
+  { key: "agent:main:current", agentId: "main" },
+  { key: "global", agentId: "research" },
+])("updates the $key Public badge when another client changes sharing", async (target) => {
+  const row: GatewaySessionRow = {
+    ...target,
+    sessionId: "session-current",
+    kind: "direct",
+    visibility: "draft",
+    sharingRole: "owner",
+  };
+  const evidence = (token?: string): SessionMembersListEvidenceResult => ({
+    sessionKey: row.key,
+    members: [],
+    identities: [],
+    role: "owner",
+    allowedVisibilities: ["shared", "draft"],
+    ...(token ? { publicShare: { token, createdAt: 1 } } : {}),
+  });
+  let published = false;
+  const { mounted, sharingRead, container, draw, settle } = await mountSharingHeader(
+    row,
+    async () => evidence(published ? "synthetic-public-locator" : undefined),
+  );
   const indicator = () =>
     container.querySelector(".chat-pane__sharing-trigger[data-public='true']");
   const changed = (key: string | null = row.key, agentId = row.agentId) => {
@@ -131,48 +140,10 @@ it("refreshes participation after profile and config changes and rejects an olde
     permissions: [{ identityId: "person", level, options: fixed ? [level] : ["read", "send"] }],
     allowedVisibilities: ["read-only"],
   });
-  const mounted = createMountedPanes([row], row.agentId, undefined, {
-    "sessions.list": () => sessionsResult([row], 1),
-  });
-  const client = mounted.context.gateway.snapshot.client!;
-  const originalRequest = client.request.bind(client);
-  const sharingRead = vi.fn(async () => evidence("read"));
-  const request = vi
-    .spyOn(client, "request")
-    .mockImplementation(async (method, params, options) =>
-      method === "session.members.listEvidence"
-        ? sharingRead()
-        : originalRequest(method, params, options),
-    );
-  const hello = mounted.context.gateway.snapshot.hello!;
-  hello.features = {
-    ...hello.features,
-    methods: [
-      ...(hello.features?.methods ?? []),
-      "session.visibility.set",
-      "session.members.listEvidence",
-    ],
-  };
-  await mounted.sessions.refresh({ agentId: row.agentId, force: true });
-  const pane = mounted.mount(row.key);
-  await refreshPane(pane);
-  const container = document.body.appendChild(document.createElement("div"));
-  const draw = () =>
-    renderPaneHeaderInto(
-      pane.renderPaneHeader(
-        createPaneHeaderWorkspaceFixture(pane.state),
-        selectedChatSessionRow(pane.state),
-        false,
-        undefined,
-        false,
-        null,
-      ),
-      container,
-    );
-  const settle = async () => {
-    await Promise.all(request.mock.results.map((result) => result.value));
-    draw();
-  };
+  const { mounted, sharingRead, request, container, draw, settle } = await mountSharingHeader(
+    row,
+    async () => evidence("read"),
+  );
   draw();
   await settle();
   container.querySelector<HTMLButtonElement>(".chat-pane__sharing-trigger")!.click();
