@@ -15,8 +15,7 @@ import type { DiagnosticsRecorderRuntime } from "./service-recorder-runtime.js";
 import type { SessionRecoveryDiagnosticEvent } from "./service-types.js";
 
 export function createOperationsRecorders(runtime: DiagnosticsRecorderRuntime) {
-  const rowSelections = new Map<string, { calls: number; rows: number }>();
-  let rowSelectionResets = 0;
+  const rowSelections = runtime.sessionRowSelectionBaseline;
   const sessionRecoveryAttrs = (evt: SessionRecoveryDiagnosticEvent) => {
     const attrs: Record<string, string> = { "openclaw.state": evt.state };
     if (evt.reason) {
@@ -278,14 +277,14 @@ export function createOperationsRecorders(runtime: DiagnosticsRecorderRuntime) {
       }
       for (const selection of totals.selections) {
         const key = `${selection.kind}:${selection.task}`;
-        const previous = rowSelections.get(key);
+        const previous = rowSelections.selections.get(key);
         const attrs = { kind: selection.kind, task: selection.task };
         runtime.sessionRowSelectionsCounter.add(selection.calls - (previous?.calls ?? 0), attrs);
         runtime.sessionRowSelectionRowsCounter.add(selection.rows - (previous?.rows ?? 0), attrs);
-        rowSelections.set(key, selection);
+        rowSelections.selections.set(key, selection);
       }
-      runtime.sessionRowSelectionResetsCounter.add(totals.resets - rowSelectionResets);
-      rowSelectionResets = totals.resets;
+      runtime.sessionRowSelectionResetsCounter.add(totals.resets - rowSelections.resets);
+      rowSelections.resets = totals.resets;
     },
     "diagnostic.memory.pressure"(evt) {
       const attrs = {

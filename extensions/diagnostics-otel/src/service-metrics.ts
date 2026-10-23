@@ -7,11 +7,26 @@ import {
 } from "./service-constants.js";
 
 const DEFAULT_METRIC_NAME_PREFIX = "openclaw.";
+type SessionRowSelectionBaseline = {
+  selections: Map<string, { calls: number; rows: number }>;
+  resets: number;
+};
+const sessionRowSelectionBaselines = new WeakMap<Meter, Map<string, SessionRowSelectionBaseline>>();
 
 export function createDiagnosticsMetrics(
   meter: Meter,
   metricNamePrefix = DEFAULT_METRIC_NAME_PREFIX,
 ) {
+  // A preloaded SDK retains its meter and instruments across plugin service reloads.
+  let meterBaselines = sessionRowSelectionBaselines.get(meter);
+  if (!meterBaselines) {
+    sessionRowSelectionBaselines.set(meter, (meterBaselines = new Map()));
+  }
+  let sessionRowSelectionBaseline = meterBaselines.get(metricNamePrefix);
+  if (!sessionRowSelectionBaseline) {
+    sessionRowSelectionBaseline = { selections: new Map(), resets: 0 };
+    meterBaselines.set(metricNamePrefix, sessionRowSelectionBaseline);
+  }
   const createCounter = (name: string, description: string, unit = "1") =>
     meter.createCounter(`${metricNamePrefix}${name}`, { unit, description });
   const createHistogram = (
@@ -29,6 +44,7 @@ export function createDiagnosticsMetrics(
     createHistogram(name, description, "ms", AGENT_DURATION_MS_BUCKETS);
 
   return {
+    sessionRowSelectionBaseline,
     sessionsListBaselineRetirementsCounter: createCounter(
       "sessions.list.baseline_retirements",
       "Session list baseline retirement events by cause, not rows or views retired",

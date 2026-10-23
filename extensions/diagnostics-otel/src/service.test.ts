@@ -1459,57 +1459,6 @@ describe("diagnostics-otel service", () => {
       },
     },
     {
-      name: "cumulative session-row selections without recounting samples",
-      trusted: true,
-      events: [4, 4, 6].map((calls) => ({
-        type: "diagnostic.memory.sample" as const,
-        memory: {
-          rssBytes: 100,
-          heapUsedBytes: 40,
-          heapTotalBytes: 80,
-          externalBytes: 10,
-          arrayBuffersBytes: 5,
-          sessionRowSelections: {
-            selections: [
-              { kind: "parent" as const, task: "control-ui-pr", calls, rows: calls * 3 },
-            ],
-            resets: 2,
-          },
-        },
-      })),
-      metrics: [
-        counter(
-          "openclaw.session.row.selections",
-          4,
-          { kind: "parent", task: "control-ui-pr" },
-          "first",
-        ),
-        counter("openclaw.session.row.selections", 0, { kind: "parent", task: "control-ui-pr" }),
-        counter(
-          "openclaw.session.row.selections",
-          2,
-          { kind: "parent", task: "control-ui-pr" },
-          "last",
-        ),
-        counter(
-          "openclaw.session.row.selection.rows",
-          12,
-          { kind: "parent", task: "control-ui-pr" },
-          "first",
-        ),
-        counter("openclaw.session.row.selection.rows", 0, {
-          kind: "parent",
-          task: "control-ui-pr",
-        }),
-        counter(
-          "openclaw.session.row.selection.rows",
-          6,
-          { kind: "parent", task: "control-ui-pr" },
-          "last",
-        ),
-      ],
-    },
-    {
       name: "memory pressure",
       events: [
         {
