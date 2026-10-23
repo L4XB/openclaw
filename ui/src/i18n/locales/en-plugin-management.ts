@@ -251,30 +251,15 @@ const enPluginManagement = {
     },
     detailCapabilities: "Capabilities",
     uiCapabilities: {
-      page: {
-        name: "Pages",
-        description: "Adds pages to OpenClaw.",
-      },
-      navigation: {
-        name: "Navigation",
-        description: "Adds links to OpenClaw navigation.",
-      },
-      panel: {
-        name: "Panels",
-        description: "Adds interface panels.",
-      },
-      action: {
-        name: "Actions",
-        description: "Adds buttons or menu actions.",
-      },
+      page: { name: "Pages", description: "Adds pages to OpenClaw." },
+      navigation: { name: "Navigation", description: "Adds links to OpenClaw navigation." },
+      panel: { name: "Panels", description: "Adds interface panels." },
+      action: { name: "Actions", description: "Adds buttons or menu actions." },
       accessory: {
         name: "Session accessories",
         description: "Adds information or controls alongside sessions.",
       },
-      widget: {
-        name: "Dashboard widgets",
-        description: "Adds widgets to the dashboard.",
-      },
+      widget: { name: "Dashboard widgets", description: "Adds widgets to the dashboard." },
       replacement: {
         name: "Interface replacements",
         description: "Replaces supported parts of the interface.",
@@ -285,10 +270,7 @@ const enPluginManagement = {
       },
     },
     capabilityFamilies: {
-      speechProviders: {
-        name: "Text to speech",
-        description: "Turn text into spoken audio.",
-      },
+      speechProviders: { name: "Text to speech", description: "Turn text into spoken audio." },
       realtimeTranscriptionProviders: {
         name: "Live transcription",
         description: "Transcribe audio as it arrives.",
@@ -317,14 +299,8 @@ const enPluginManagement = {
         name: "Embeddings",
         description: "Represent content for semantic search and retrieval.",
       },
-      webSearchProviders: {
-        name: "Web search",
-        description: "Find information on the web.",
-      },
-      webFetchProviders: {
-        name: "Web fetching",
-        description: "Read content from web pages.",
-      },
+      webSearchProviders: { name: "Web search", description: "Find information on the web." },
+      webFetchProviders: { name: "Web fetching", description: "Read content from web pages." },
       webContentExtractors: {
         name: "Web content extraction",
         description: "Extract readable content from web pages.",
@@ -337,10 +313,7 @@ const enPluginManagement = {
         name: "Transcripts",
         description: "Capture or import transcripts from supported sources.",
       },
-      migrationProviders: {
-        name: "Migration",
-        description: "Bring supported data into OpenClaw.",
-      },
+      migrationProviders: { name: "Migration", description: "Bring supported data into OpenClaw." },
     },
     breadcrumb: "Breadcrumb",
     settingsDescription: "Configure installed plugins, access, and lifecycle.",
@@ -474,11 +447,7 @@ const enPluginManagement = {
       scope: "Requested permissions",
       description: "What this server does",
       unavailable: "Connection details are not included in this plugin’s catalog metadata.",
-      auth: {
-        oauth: "OAuth",
-        "api-key": "API key",
-        none: "None",
-      },
+      auth: { oauth: "OAuth", "api-key": "API key", none: "None" },
     },
     detailTabs: {
       readme: "README",

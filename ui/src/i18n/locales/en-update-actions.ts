@@ -159,10 +159,21 @@ const enUpdateActions = {
 
 export const registerUpdateActionsEnglish = Object.assign(
   () => {
-    const { run, target, sidebar, confirm, dialog, triage, report, ...labels } =
-      enUpdateActions.updates;
+    const {
+      run,
+      target,
+      sidebar,
+      confirm,
+      dialog,
+      triage,
+      report,
+      adminRequired,
+      refreshFailed,
+      holdOneHour,
+      reviewUpdate,
+    } = enUpdateActions.updates;
     const { phase, ...runLabels } = run;
-    Object.assign(en.updates, labels);
+    Object.assign(en.updates, { adminRequired, refreshFailed, holdOneHour, reviewUpdate });
     Object.assign(en.updates.run, runLabels);
     Object.assign(en.updates.run.phase, phase);
     Object.assign(en.updates.target, target);

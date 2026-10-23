@@ -19,7 +19,8 @@ describe("Browser English loading", () => {
       const browser = en.browser;
       const errors = browser.errors;
       const annotatePrompt = browser.annotatePrompt;
-      const sibling = browser.loading;
+      const sibling = browser.title;
+      expect(browser.loading).toBeUndefined();
       expect(browser.downloading).toBeUndefined();
       expect(browser.downloadFile).toBeUndefined();
       expect(browser.navigationBlocked).toBeUndefined();
@@ -33,7 +34,8 @@ describe("Browser English loading", () => {
       expect(en.browser).toBe(browser);
       expect(en.browser.errors).toBe(errors);
       expect(en.browser.annotatePrompt).toBe(annotatePrompt);
-      expect(browser.loading).toBe(sibling);
+      expect(browser.title).toBe(sibling);
+      expect(browser.loading).toBe("Loading page…");
       expect(errors.screenshotPathMissing).toBe("Browser screenshot did not return a media path.");
       expect(manager.t("common.health")).toBe("Gesundheit");
       expect(manager.t("browser.downloading")).toBe("Downloading…");
