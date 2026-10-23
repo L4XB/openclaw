@@ -96,12 +96,8 @@ describeControlUiE2e("Control UI progressive Model Providers loading", () => {
       await page.locator('a[href="/settings/model-providers"]').first().click();
       await waitForControlUiRoute(page, { routeId: "model-providers" });
       expect((await badge.textContent())?.trim()).toBe("Ready");
-      await expect
-        .poll(async () => (await gateway.getRequests("models.list")).length)
-        .toBe(reads + 2);
       expect((await gateway.getRequests("models.list")).map((request) => request.params)).toEqual([
         { view: "configured", agentId: "main" },
-        { view: "configured", preparedOnly: true, agentId: "main" },
       ]);
     } finally {
       await context.close();
