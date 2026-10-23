@@ -1662,6 +1662,7 @@ src/state/openclaw-agent-db-metadata.ts
 src/state/openclaw-agent-db-migration-required.ts
 src/state/openclaw-agent-db-permissions.ts
 src/state/openclaw-agent-db-read-error.ts
+src/state/openclaw-agent-db-opening-refusal.ts
 src/state/openclaw-agent-db-readonly-companion.ts
 src/state/openclaw-agent-db-readonly-open.ts
 src/state/openclaw-agent-db-readonly-scope.ts
@@ -1696,6 +1697,7 @@ src/state/openclaw-agent-execution-scope.ts
 src/state/openclaw-agent-execution.ts
 src/state/openclaw-agent-goal-operations-schema.ts
 src/state/openclaw-agent-message-tool-outcome-schema.ts
+src/state/openclaw-agent-native-stop-observation.ts
 src/state/openclaw-agent-participants-migration.ts
 src/state/openclaw-agent-pending-inputs-schema.ts
 src/state/openclaw-agent-progress-card-schema.ts
