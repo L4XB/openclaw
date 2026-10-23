@@ -677,11 +677,6 @@
   font-size: 12px;
 }
 
-.chat-pane__sharing-member > .oc-menu-item__icon {
-  display: flex;
-  align-items: center;
-}
-
 .chat-pane__sharing-member-icon {
   display: inline-flex;
   width: 20px;
@@ -1133,11 +1128,6 @@
   background: var(--bg-hover);
 }
 
-.chat-pane__sharing-menu--desktop .chat-pane__sharing-person--creator:disabled {
-  opacity: 1;
-  cursor: default;
-}
-
 .chat-pane__sharing-menu--desktop
   .chat-pane__sharing-person--creator
   .chat-pane__sharing-member-icon {
@@ -1166,23 +1156,6 @@
   min-height: 24px;
   padding: 0;
   gap: 8px;
-}
-
-.chat-pane__sharing-menu--desktop .chat-pane__sharing-member-check {
-  display: grid;
-  place-items: center;
-  color: var(--accent);
-}
-
-.chat-pane__sharing-menu--desktop .chat-pane__sharing-member-check svg {
-  width: 14px;
-  height: 14px;
-}
-
-.chat-pane__sharing-menu--desktop
-  .chat-pane__sharing-person--creator
-  .chat-pane__sharing-member-check {
-  color: var(--muted);
 }
 
 .chat-pane__sharing-menu--desktop .chat-pane__sharing-empty {

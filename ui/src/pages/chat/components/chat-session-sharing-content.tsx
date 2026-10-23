@@ -299,7 +299,6 @@ function useDesktopSharing(props: ChatSessionSharingProps, controls: MenuControl
                   }
                 >
                   <span class="chat-pane__sharing-permission">{row().controlLabel}</span>
-                  <span class="chat-pane__sharing-member-check" aria-hidden="true" />
                 </Show>
               </div>
             ),

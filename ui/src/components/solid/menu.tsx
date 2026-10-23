@@ -581,6 +581,7 @@ export function Menu(props: BranchProps): JSX.Element {
         ]}
         role={initialIdentity.parent ? "menuitem" : undefined}
         aria-haspopup="menu"
+        aria-disabled={props.disabled ? "true" : props.triggerAttributes?.["aria-disabled"]}
         aria-controls={`${initialIdentity.id}:content`}
         aria-expanded={opened() ? "true" : "false"}
         data-highlighted={

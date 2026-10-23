@@ -12,13 +12,18 @@ export function mountPeopleSharing(
   const key = "agent:main:people";
   return mountSolid(() =>
     createComponent(ChatSessionSharing, {
-      session: { key, kind: "direct", updatedAt: 1, sharingRole: "owner" },
+      session: { key, kind: "direct", updatedAt: 1, sharingRole: "owner", visibility: "read-only" },
       state: {
         loading: false,
         result: {
           sessionKey: key,
           role: "owner",
-          allowedVisibilities: ["shared"],
+          allowedVisibilities: ["read-only"],
+          permissions: Array.from({ length: count }, (_, i) => ({
+            identityId: `person-${i}`,
+            level: memberIds.includes(`person-${i}`) ? ("send" as const) : ("read" as const),
+            options: ["read", "send"],
+          })),
           members: memberIds.map((identityId) => ({ identityId, addedBy: "owner", addedAt: 1 })),
           identities: Array.from({ length: count }, (_, i) => ({
             type: "human" as const,
