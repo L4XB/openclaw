@@ -1,6 +1,6 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import { Type } from "typebox";
-import { afterEach, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 import { runAgentLoop } from "../../packages/agent-core/src/agent-loop.js";
 import type { StreamFn } from "../../packages/agent-core/src/types.js";
 import type { AssistantMessage, Message } from "../llm/types.js";
@@ -27,9 +27,7 @@ import {
 } from "./tool-search.js";
 import { gatewayStub, validArgs } from "./tools/ask-user-tool.gateway.test-fixture.js";
 import { createAskUserTool } from "./tools/ask-user-tool.js";
-import { resetPendingAskUserQuestionsForTest } from "./tools/ask-user-tool.test-support.js";
 import { jsonResult, type AnyAgentTool } from "./tools/common.js";
-afterEach(resetPendingAskUserQuestionsForTest);
 
 function deferredFixture() {
   const abort = new AbortController();

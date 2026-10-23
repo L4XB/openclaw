@@ -443,18 +443,6 @@ function createAskUserPromptDelivery(
   return { state, delivery };
 }
 
-function resetPendingAskUserQuestionsForTest(): void {
-  for (const questionId of askUserQuestions.keys()) {
-    releaseAskUserQuestion(questionId);
-  }
-}
-
-if (process.env.VITEST || process.env.NODE_ENV === "test") {
-  (globalThis as Record<PropertyKey, unknown>)[Symbol.for("openclaw.askUserToolTestApi")] = {
-    resetPendingAskUserQuestionsForTest,
-  };
-}
-
 /** Creates a main-session question tool with host-negotiated durable custody. */
 export function createAskUserTool(params: {
   agentId?: string;

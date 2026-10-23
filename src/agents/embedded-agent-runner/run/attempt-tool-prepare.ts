@@ -198,9 +198,7 @@ export async function prepareEmbeddedAttemptToolBase(params: {
   const cronCreatorToolAllowlist: CronCreatorToolAllowlistEntry[] = [];
   const cronCreatorToolAllowlistCaptureRef: CronToolsAllowCaptureRef = {};
   const inheritedToolAllowlist: string[] = [];
-  const inheritedPublicationToolRef: NonNullable<
-    OpenClawCodingToolsOptions["inheritedPublicationToolRef"]
-  > = {};
+  const additionalInheritedToolNamesRef: string[] = [];
   const generationCleanups: Array<(reason: string) => Promise<void>> = [];
   const retiringGenerations = new Set<Promise<void>>();
   let retiredCleanupFailed = false;
@@ -237,6 +235,7 @@ export async function prepareEmbeddedAttemptToolBase(params: {
     modelId: attempt.modelId,
     modelApi: attempt.model.api,
     modelBaseUrl: attempt.model.baseUrl,
+    modelParams: attempt.model.params,
     modelContextWindowTokens: attempt.contextTokenBudget ?? attempt.model.contextWindow,
     modelHasVision: attempt.model.input?.includes("image") ?? false,
     workspaceDir: params.setup.effectiveWorkspace,
@@ -310,7 +309,7 @@ export async function prepareEmbeddedAttemptToolBase(params: {
     abortSignal: AbortSignal,
   ) => {
     webSearchUnconfigured = false;
-    inheritedPublicationToolRef.current = undefined;
+    additionalInheritedToolNamesRef.length = 0;
     let constructedToolsRaw: Awaited<ReturnType<typeof createOpenClawCodingToolsInternalAsync>> =
       [];
     if (shouldConstructTools) {
@@ -336,6 +335,7 @@ export async function prepareEmbeddedAttemptToolBase(params: {
         assertInvocationCurrent: assertActive,
         agentId: params.setup.sessionAgentId,
         ...buildConversationContext(),
+        forceRestartSafeTools: attempt.forceRestartSafeTools,
         exec: {
           ...attempt.execOverrides,
           ...(sessionPermissionPolicy
@@ -405,10 +405,8 @@ export async function prepareEmbeddedAttemptToolBase(params: {
         inputProvenance: attempt.inputProvenance,
         disableMessageTool: attempt.disableMessageTool,
         forceMessageTool: attempt.forceMessageTool,
-        enableHeartbeatTool: attempt.enableHeartbeatTool,
-        forceHeartbeatTool: attempt.forceHeartbeatTool,
         inheritedToolAllowlistRef: inheritedToolAllowlist,
-        inheritedPublicationToolRef,
+        additionalInheritedToolNamesRef,
         cronCreatorToolAllowlistRef: cronCreatorToolAllowlist,
         cronCreatorToolAllowlistCaptureRef,
         authProfileStore: attempt.authProfileStore,
@@ -547,7 +545,7 @@ export async function prepareEmbeddedAttemptToolBase(params: {
       forceDirectMessageTool,
       requireExplicitMessageTarget,
       inheritedToolAllowlist,
-      inheritedPublicationToolRef,
+      additionalInheritedToolNamesRef,
       localModelLeanEnabled,
       localModelLeanPreserveToolNames,
       replaySafetyOptions,

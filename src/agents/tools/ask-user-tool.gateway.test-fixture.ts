@@ -1,11 +1,14 @@
-import { vi } from "vitest";
+import { onTestFinished, vi } from "vitest";
 import { awaitGateBeforeSettlement, createDeferred } from "../../../test/helpers/promise.js";
+import * as questionDispatch from "../harness/gateway-question-dispatch.js";
 import type { createAskUserTool } from "./ask-user-tool.js";
 
 type GatewayCall = Extract<
   NonNullable<Parameters<typeof createAskUserTool>[0]["gatewayCall"]>,
   (...args: never[]) => unknown
 >;
+const resolveGatewayCall = questionDispatch.resolveAgentQuestionGatewayCall;
+
 export const validArgs = {
   questions: [
     {
@@ -42,10 +45,15 @@ export function gatewayStub(
     }
     return response;
   });
+  // SAFETY: Each fixture selects its response by RPC method; this mock forwards the exact call and promise unchanged.
+  const call = resolveGatewayCall(mock as GatewayCall);
+  const resolver = vi
+    .spyOn(questionDispatch, "resolveAgentQuestionGatewayCall")
+    .mockReturnValue(call);
+  onTestFinished(() => resolver.mockRestore());
   return {
     mock,
-    // SAFETY: Each fixture selects its response by RPC method; this mock forwards the exact call and promise unchanged.
-    call: mock as GatewayCall,
+    call,
     waitForCall: (method: keyof typeof started, operation: PromiseLike<unknown>) =>
       awaitGateBeforeSettlement(
         started[method].promise,

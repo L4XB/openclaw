@@ -20,7 +20,6 @@ import { AuthStorage } from "../../sessions/auth-storage.js";
 import { ModelRegistry } from "../../sessions/model-registry.js";
 import { makeProviderModelFixture } from "../../test-helpers/provider-model-fixture.js";
 import { validArgs } from "../../tools/ask-user-tool.gateway.test-fixture.js";
-import { resetPendingAskUserQuestionsForTest } from "../../tools/ask-user-tool.test-support.js";
 import { createAttemptSetupFixture } from "./attempt-setup.test-support.js";
 import { prepareEmbeddedAttemptToolBase } from "./attempt-tool-prepare.js";
 import type { EmbeddedRunAttemptInternalParams } from "./internal-params.js";
@@ -37,7 +36,6 @@ beforeEach(() => {
   transport.mockReset();
 });
 afterEach(() => {
-  resetPendingAskUserQuestionsForTest();
   vi.restoreAllMocks();
 });
 

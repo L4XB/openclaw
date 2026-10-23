@@ -36,12 +36,13 @@ import {
   resolveUiConversationIdentity,
 } from "../../lib/sessions/session-key.ts";
 import { showToast } from "../../lib/toast.ts";
+import { cacheChatBoardSnapshotAfterHydration } from "./chat-board-snapshot.ts";
 import { ChatPaneHistory } from "./chat-pane-history.ts";
 import type { ResolvedBoardView } from "./chat-pane-shared.ts";
-import { ensureLazySidebarElement } from "./chat-pane-sidebar-layout.ts";
 import type { ChatBoardPanel } from "./chat-pane-surfaces.tsx";
 import type { ChatPageHost } from "./chat-state-host.ts";
 import { selectedChatSessionRow } from "./chat-state-route.ts";
+import { readChatSessionSnapshot } from "./session-message-cache.ts";
 import {
   SIDEBAR_NARROW_BREAKPOINT_PX,
   fitSidebarLayout,
@@ -289,19 +290,45 @@ export abstract class ChatPaneBoard extends ChatPaneHistory {
       const key = JSON.stringify([presentationScope?.key, boardProviderCacheKey(session)]);
       if (this.boardProviderLease?.cacheKey !== key) {
         this.releaseBoardProviderLease();
+        const state = this.state;
+        const context = this.context;
+        let active = true;
+        const lease = acquireBoardProviderForSession(
+          session,
+          client,
+          gateway.phase === "connected",
+          canPinWidgets,
+          canPinMcpApps,
+          canMutate,
+          canGrant,
+          presentationScope,
+          (snapshot, receivedAtMs) => {
+            const currentState = this.state;
+            if (!currentState) {
+              return;
+            }
+            cacheChatBoardSnapshotAfterHydration(
+              currentState,
+              session,
+              snapshot,
+              receivedAtMs,
+              () => active && gatewayPresentationScope(context.gateway) === presentationScope,
+            );
+          },
+        );
         this.boardProviderLease = {
-          ...acquireBoardProviderForSession(
-            session,
-            client,
-            gateway.phase === "connected",
-            canPinWidgets,
-            canPinMcpApps,
-            canMutate,
-            canGrant,
-            presentationScope,
-          ),
+          ...lease,
           cacheKey: key,
+          release: () => {
+            active = false;
+            lease.release();
+          },
         };
+        const cached =
+          state && readChatSessionSnapshot(state.chatMessagesBySession, state, session);
+        if (cached?.board) {
+          this.boardProviderLease.restoreSnapshot(cached.board.snapshot, cached.board.receivedAtMs);
+        }
       } else {
         this.boardProviderLease.update(client, gateway.phase === "connected", {
           canPinWidgets,
@@ -414,16 +441,6 @@ export abstract class ChatPaneBoard extends ChatPaneHistory {
       ) {
         this.showDashboard((row?.boardPresentation ?? "split") === "expanded");
       }
-    }
-    if (
-      this.presented &&
-      this.presentation.documentVisible &&
-      board.available &&
-      this.state &&
-      isSidebarSlotVisible(this.state.sidebarLayout, "dashboard") &&
-      !customElements.get("openclaw-board-view")
-    ) {
-      ensureLazySidebarElement("dashboard");
     }
   }
 
@@ -628,7 +645,6 @@ export abstract class ChatPaneBoard extends ChatPaneHistory {
     const connectionGeneration = this.connectionGeneration;
     return {
       error: error || undefined,
-      elementReady: Boolean(customElements.get("openclaw-board-view")),
       surface: {
         onViewRef: (element) => {
           this.boardView = element;

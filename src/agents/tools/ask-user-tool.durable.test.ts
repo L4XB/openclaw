@@ -1,13 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../test/helpers/promise.js";
 import { wrapToolWithAbortSignal } from "../agent-tools.abort.js";
 import { SESSIONS_YIELD_ABORT_REASON } from "../embedded-agent-runner/run/attempt-sessions-yield.js";
 import { gatewayStub, validArgs } from "./ask-user-tool.gateway.test-fixture.js";
 import { createAskUserTool } from "./ask-user-tool.js";
-import { resetPendingAskUserQuestionsForTest } from "./ask-user-tool.test-support.js";
 import { createSessionsYieldTool } from "./sessions-yield-tool.js";
-
-afterEach(resetPendingAskUserQuestionsForTest);
 
 describe("native durable ask_user handoff", () => {
   it("cancels a transient question when a sibling hands off the run", async () => {
