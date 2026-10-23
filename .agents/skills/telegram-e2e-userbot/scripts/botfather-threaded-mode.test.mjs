@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { setBotFatherThreadedMode } from "./botfather-threaded-mode.mjs";
 
-function fixture(context, { initial = false, acceptsChange = true } = {}) {
+function fixture(context, { initial = false, acceptsChange = true, closeFails = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "botfather-mode-"));
   context.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const urlFile = path.join(root, "url");
@@ -34,7 +34,9 @@ function fixture(context, { initial = false, acceptsChange = true } = {}) {
             return enabled;
           },
           async waitFor({ state }) {
-            if ((state === "visible") !== enabled) throw new Error(`request failed: ${url}`);
+            if ((state === "visible") !== enabled) {
+              throw new Error(`request failed: ${url}`);
+            }
           },
         };
       }
@@ -46,7 +48,9 @@ function fixture(context, { initial = false, acceptsChange = true } = {}) {
         async click() {
           if (text === "Threaded Mode") {
             toggles += 1;
-            if (acceptsChange) enabled = !enabled;
+            if (acceptsChange) {
+              enabled = !enabled;
+            }
           }
         },
       };
@@ -65,6 +69,9 @@ function fixture(context, { initial = false, acceptsChange = true } = {}) {
           },
           async close() {
             closed = true;
+            if (closeFails) {
+              throw new Error(`browser close failed: ${url}`);
+            }
           },
         };
       },
@@ -99,6 +106,15 @@ test("an unconfirmed switch fails without leaking the signed URL", async (contex
     return true;
   });
   assert.equal(f.closed(), true);
+});
+
+test("a failed browser close cannot report success or expose its URL", async (context) => {
+  const f = fixture(context, { closeFails: true });
+  await assert.rejects(setBotFatherThreadedMode({ ...f, enabled: true }), (error) => {
+    assert.equal(error.message, "BotFather browser cleanup failed.");
+    assert.equal(error.stack.includes(f.url), false);
+    return true;
+  });
 });
 
 test("a world-readable URL file is rejected before opening a browser", async (context) => {

@@ -163,8 +163,9 @@ function parseArgs(argv) {
     } else if (arg === "--chat") args.chat = argv[++i] || "";
     else if (arg === "--dm") args.dm = true;
     else if (arg === "--create-forum") args.createForum = true;
-    else if (arg === "--create-dm-topic") args.createDmTopic = true;
-    else if (arg === "--pre-send") args.preSend.push(argv[++i] || "");
+    else if (arg === "--create-dm-topic") {
+      args.createDmTopic = true;
+    } else if (arg === "--pre-send") args.preSend.push(argv[++i] || "");
     else if (arg === "--scenario") args.scenarioPath = argv[++i] || "";
     else if (arg === "--source-gateway") args.sourceGateway = true;
     else if (arg === "--gateway-ready-timeout-ms") {

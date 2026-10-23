@@ -4,6 +4,8 @@ import { pathToFileURL } from "node:url";
 
 export async function setBotFatherThreadedMode({ urlFile, username, enabled, chromium }) {
   let browser;
+  let state;
+  let failure;
   try {
     if ((fs.statSync(urlFile).mode & 0o077) !== 0) {
       throw new Error("Mini App URL file must be private.");
@@ -32,18 +34,23 @@ export async function setBotFatherThreadedMode({ urlFile, username, enabled, chr
       await enabledMarker.waitFor({ state: enabled ? "visible" : "hidden", timeout: 30_000 });
     }
     const after = await enabledMarker.isVisible();
-    if (after !== enabled) throw new Error("Threaded Mode was not confirmed.");
-    return { before, after };
+    if (after !== enabled) {
+      throw new Error("Threaded Mode was not confirmed.");
+    }
+    state = { before, after };
   } catch {
     // Navigation errors can embed the signed Mini App URL. Keep diagnostics credential-free.
-    throw new Error("BotFather Threaded Mode could not be confirmed.");
-  } finally {
-    try {
-      await browser?.close();
-    } catch {
-      throw new Error("BotFather browser cleanup failed.");
-    }
+    failure = new Error("BotFather Threaded Mode could not be confirmed.");
   }
+  try {
+    await browser?.close();
+  } catch {
+    failure ??= new Error("BotFather browser cleanup failed.");
+  }
+  if (failure) {
+    throw failure;
+  }
+  return state;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

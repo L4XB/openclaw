@@ -87,7 +87,9 @@ async function ownTelegramFixture(
     if (evidence.setup.ok !== true || !(dmTopic ? /^[1-9]\d*$/u : /^-\d+$/u).test(chatId)) {
       throw new Error(`Telegram ${kind} setup returned an invalid chat identity.`);
     }
-    if (!dmTopic) credential.groupId = chatId;
+    if (!dmTopic) {
+      credential.groupId = chatId;
+    }
     credential.driverEnv.TELEGRAM_USER_DRIVER_CHAT_ID = chatId;
   } catch (error) {
     evidence.setup = { status: "failed", error: error.message };

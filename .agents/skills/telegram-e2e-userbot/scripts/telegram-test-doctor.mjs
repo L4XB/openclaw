@@ -56,7 +56,9 @@ export async function checkTelegramTestCredential({
   const scope = currentTelegramRun();
   const lease = scope.health;
   if (dm && requireForum) throw new Error("Forum-topic proof requires a forum group target.");
-  if (createDmTopic && !dm) throw new Error("DM-topic proof requires --dm.");
+  if (createDmTopic && !dm) {
+    throw new Error("DM-topic proof requires --dm.");
+  }
   lease.assertHealthy();
   const driverEnv = { ...sanitizeChildEnvironment(), ...credential.driverEnv };
   const requiredChat = dm || chat || createForum ? "" : credential.groupId;
