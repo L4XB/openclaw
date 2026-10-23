@@ -64,7 +64,7 @@ export function readCronRunRecordsInDatabase(
   const planningOnly = options?.planningOnly === true;
   let select = query(db)
     .selectFrom("task_runs")
-    .select(() => [
+    .select([
       "task_id",
       "source_id",
       "run_id",
