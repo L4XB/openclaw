@@ -57,12 +57,9 @@ export function retainSqliteWorkerErrorCode(error: Error, source: unknown): Erro
   return error;
 }
 
-/** Recognize canonical broker errors without admitting cleanup aggregates for retry. */
-export function isSqliteWorkerError(
-  error: unknown,
-  code: SqliteWorkerError["code"],
-): error is SqliteWorkerError {
-  if (!(error instanceof Error) || error instanceof AggregateError) {
+/** Read only this error's retained classification, including cleanup aggregates. */
+export function hasSqliteWorkerErrorCode(error: unknown, code: SqliteWorkerError["code"]): boolean {
+  if (!(error instanceof Error)) {
     return false;
   }
   try {
@@ -70,6 +67,14 @@ export function isSqliteWorkerError(
   } catch {
     return false;
   }
+}
+
+/** Recognize canonical broker errors without admitting cleanup aggregates for retry. */
+export function isSqliteWorkerError(
+  error: unknown,
+  code: SqliteWorkerError["code"],
+): error is SqliteWorkerError {
+  return !(error instanceof AggregateError) && hasSqliteWorkerErrorCode(error, code);
 }
 
 /** Unknown native outcomes remain terminal through canonical cause and cleanup envelopes. */

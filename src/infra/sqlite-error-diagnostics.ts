@@ -109,6 +109,13 @@ function classifyStorageFailure(error: unknown): GatewayStorageFailure | undefin
   const fields = typeof error === "string" ? { message: error } : isRecord(error) ? error : {};
   const code =
     readOwnErrorDataProperty(fields, "errorCode") ?? readOwnErrorDataProperty(fields, "code");
+  // Only the host projection's typed pair carries confirmed rollback presentation.
+  if (
+    code === "unavailable" &&
+    readOwnErrorDataProperty(fields, "errorType") === "SqliteWorkerError"
+  ) {
+    return "unavailable";
+  }
   // The decoder's name survives the actor's name/message-only error projection.
   // A provider's unrelated 57014 code must not acquire storage semantics.
   if (

@@ -30,6 +30,34 @@ function expectFailureGraph(error: unknown, ...originals: Error[]) {
   }
 }
 
+it("stops before another model request when the outcome hook rejects an unknown write", async () => {
+  const uncertain = new SqliteWorkerError("Synthetic outcome hook failure", "outcome-unknown");
+  const executeWrite = vi.fn(async () => ({ content: [], details: {} }));
+  const executeNext = vi.fn(async () => ({ content: [], details: {} }));
+  const streamFn = vi.fn(createTurnSequenceStream([[makeCall("write")], [makeCall("next")]]));
+  const agent = new Agent({
+    streamFn,
+    afterToolOutcome: async ({ toolCall }) => {
+      if (toolCall.name === "write") {
+        throw uncertain;
+      }
+    },
+    initialState: {
+      tools: [
+        { ...makeTool("write"), execute: executeWrite },
+        { ...makeTool("next"), execute: executeNext },
+      ],
+    },
+  });
+  const outcome = await agent.prompt("Write and continue").catch((error: unknown) => error);
+  expectFailureGraph(outcome, uncertain);
+  expect(outcome).toBe(uncertain);
+  expect(executeWrite).toHaveBeenCalledOnce();
+  expect(streamFn).toHaveBeenCalledOnce();
+  expect(executeNext).not.toHaveBeenCalled();
+  expect(agent.state.isStreaming).toBe(false);
+});
+
 it.each(["execution", "after-call"] as const)(
   "retains an uncertain sibling when the first parallel failure is in %s",
   async (phase) => {

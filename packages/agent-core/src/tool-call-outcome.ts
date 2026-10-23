@@ -156,6 +156,9 @@ async function applyToolOutcomeHook(
       isError: afterResult.isError ?? finalized.isError,
     };
   } catch (error) {
+    if (batch.isLocalError?.(error)) {
+      throw error;
+    }
     const errorResult = createErrorToolResult(coerceErrorMessage(error));
     return {
       ...finalized,
