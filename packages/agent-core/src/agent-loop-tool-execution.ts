@@ -1,4 +1,4 @@
-import type { AgentEventSink } from "./agent-stream-response.js";
+import type { AgentEventSink, ExecutedToolCallBatch } from "./agent-stream-response.js";
 import {
   getInternalToolExecutionPreparer,
   type InternalToolExecutionPreparation,
@@ -6,6 +6,7 @@ import {
 } from "./internal-hooks.js";
 import type { AgentCoreStreamRuntimeDeps } from "./runtime-deps.js";
 import { createRejectedToolCallLauncher } from "./tool-batch-admission.js";
+import { mergeToolExecutionFailure } from "./tool-batch-completion.js";
 import {
   createErrorToolResult,
   createToolExecutionErrorResult,
@@ -104,9 +105,29 @@ export async function prepareToolCallExecution(
       ),
     );
   };
-  const finishUpdates = async () => {
-    closeUpdates();
-    await Promise.all(updateEvents);
+  const finishUpdates = async (
+    primary?: ExecutedToolCallBatch["fatal"],
+    disposeSource?: () => void,
+  ) => {
+    let failure: ExecutedToolCallBatch["fatal"];
+    try {
+      closeUpdates();
+    } catch (error) {
+      failure = mergeToolExecutionFailure(primary, error);
+    }
+    for (const update of await Promise.allSettled(updateEvents)) {
+      if (update.status === "rejected") {
+        failure = mergeToolExecutionFailure(failure ?? primary, update.reason);
+      }
+    }
+    try {
+      disposeSource?.();
+    } catch (error) {
+      failure = mergeToolExecutionFailure(failure ?? primary, error);
+    }
+    if (failure) {
+      throw failure.error;
+    }
   };
   const readyExecution = (
     args: unknown,
@@ -128,6 +149,7 @@ export async function prepareToolCallExecution(
       async execute(onImplementationStart) {
         let executionStarted = false;
         let implementationStartError: { error: unknown } | undefined;
+        let executionFailure: ExecutedToolCallBatch["fatal"];
         try {
           if (signal?.aborted) {
             return {
@@ -151,6 +173,7 @@ export async function prepareToolCallExecution(
             }
             return { result, isError: false, executionStarted };
           } catch (error) {
+            executionFailure = { error: implementationStartError?.error ?? error };
             if (implementationStartError) {
               throw implementationStartError.error;
             }
@@ -166,9 +189,11 @@ export async function prepareToolCallExecution(
                 : {}),
             };
           }
+        } catch (error) {
+          executionFailure = { error };
+          throw error;
         } finally {
-          await finishUpdates();
-          dispose();
+          await finishUpdates(executionFailure, dispose);
         }
       },
     };
@@ -204,7 +229,7 @@ export async function prepareToolCallExecution(
       }),
     );
   } catch (error) {
-    await finishUpdates();
+    await finishUpdates({ error });
     if (isLocalError?.(error)) {
       throw error;
     }
@@ -219,9 +244,12 @@ export async function prepareToolCallExecution(
   }
 
   if (internalPreparation.kind === "immediate") {
-    closeUpdates();
-    internalPreparation.dispose();
-    await finishUpdates();
+    await finishUpdates(
+      internalPreparation.outcome.kind === "error"
+        ? { error: internalPreparation.outcome.error }
+        : undefined,
+      () => internalPreparation.dispose(),
+    );
     if (
       internalPreparation.outcome.kind === "error" &&
       isLocalError?.(internalPreparation.outcome.error)
@@ -282,6 +310,13 @@ export async function launchParallelToolCalls(
   const ready = entries.flatMap((entry, index) => ("kind" in entry ? [{ entry, index }] : []));
   const launchRejectedBefore = createRejectedToolCallLauncher(entries, batchLifecycle);
   const result: ParallelToolCallLaunches = { started: [], completed: [] };
+  const preparations: Promise<void>[] = [];
+  const reject = (index: number, error: unknown) => {
+    result.rejected = {
+      index: result.rejected?.index ?? index,
+      error: mergeToolExecutionFailure(result.rejected, error).error,
+    };
+  };
   let cursor = 0;
   let finish!: () => void;
   const done = new Promise<void>((resolve) => {
@@ -294,6 +329,8 @@ export async function launchParallelToolCalls(
       finish();
       return;
     }
+    const preparation = Promise.withResolvers<void>();
+    preparations.push(preparation.promise);
     const launchState: { outcome?: Promise<ExecutedToolCallOutcome> } = {};
     let started = false;
     let rejected = false;
@@ -304,11 +341,12 @@ export async function launchParallelToolCalls(
         ]);
       } catch (error) {
         rejected = true;
-        result.rejected = { index: current.index, error };
+        reject(current.index, error);
         finish();
         throw error;
       }
       started = true;
+      preparation.resolve();
       toolPlan.executionStarted = true;
       if (launchState.outcome) {
         result.started.push({ ...current, outcome: launchState.outcome });
@@ -324,20 +362,22 @@ export async function launchParallelToolCalls(
     }
     void outcome.then(
       (completed) => {
+        preparation.resolve();
         if (!started && !rejected) {
           result.completed.push({ ...current, outcome: completed });
           queueMicrotask(launchNext);
         }
       },
       (error: unknown) => {
-        if (!rejected) {
-          result.rejected ??= { index: current.index, error };
-          finish();
-        }
+        preparation.resolve();
+        reject(current.index, error);
+        finish();
       },
     );
   };
   launchNext();
   await done;
+  // Already-invoked guards retain custody until they start or settle, even after a sibling fails.
+  await Promise.all(preparations);
   return result;
 }

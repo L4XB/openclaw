@@ -38,10 +38,13 @@ import type { AgentCoreStreamRuntimeDeps } from "./runtime-deps.js";
 import { admittedEntryIds, admittedIds, toToolBatchCalls } from "./tool-batch-admission.js";
 import {
   combineExecutedToolBatches,
+  drainToolCallGroup,
+  mergeRejectedToolOutcomes,
+  mergeToolExecutionFailure,
   resolveToolBatchTermination,
 } from "./tool-batch-completion.js";
 import {
-  createErrorToolResult,
+  completeUnstartedToolCall,
   finalizeToolCallOutcome,
   finalizeExecutedToolCall,
   immediateToolArgumentValidationError,
@@ -76,12 +79,6 @@ export type { AgentEventSink } from "./agent-stream-response.js";
 
 const TOOL_LOOP_RECOVERY_TERMINATED_MESSAGE =
   "OpenClaw stopped this run because tool-loop recovery encountered another critical loop. No blocked tool action was executed.";
-const STEERING_TOOL_SKIP_MESSAGE = "Skipped to process an incoming message.";
-const TOOL_ADMISSION_FAILURE_MESSAGE = "Tool execution was blocked before launch.";
-const TOOL_ADMISSION_FAILURE_DETAILS = {
-  status: "blocked",
-  deniedReason: "tool-admission",
-} as const;
 
 /** Run a prompt-started loop and emit events through a caller-owned sink. */
 export async function runAgentLoop(
@@ -357,7 +354,11 @@ async function runLoop(
         newMessages.push(result);
       }
 
-      await emit({ type: "turn_end", message, toolResults });
+      try {
+        await emit({ type: "turn_end", message, toolResults });
+      } catch (error) {
+        throw mergeToolExecutionFailure(executedToolBatch?.fatal, error).error;
+      }
       turnOpen = false;
       if (executedToolBatch?.fatal) {
         throw executedToolBatch.fatal.error;
@@ -616,6 +617,7 @@ async function executeToolCallGroups(
 
     const entries: FinalizedToolCallEntry[] = [];
     let started: StartedToolCall[] = [];
+    let thrown: ExecutedToolCallBatch["fatal"];
     try {
       // Sequential groups commit before preparing the next call. Parallel groups
       // prepare together, then commit in source order after their started work settles.
@@ -636,6 +638,7 @@ async function executeToolCallGroups(
           }
         }
       } catch (error) {
+        fatal = mergeToolExecutionFailure(fatal, error);
         // Nothing in this group launched; release its prefix, failing call, and tail.
         batch.lifecycle?.releaseSkippedCalls?.(
           admittedIds(toolCalls.slice(groupStart), batch.validated),
@@ -678,6 +681,7 @@ async function executeToolCallGroups(
         steeringMessages.length > 0
           ? undefined
           : await launchParallelToolCalls(entries, batch.lifecycle, batch.toolPlan);
+      fatal = launched?.rejected ? { error: launched.rejected.error } : undefined;
       started = launched?.started ?? [];
       const startedIndices = new Set(started.map(({ index }) => index));
       // Streamed batches serialize admission until source execution begins.
@@ -690,6 +694,7 @@ async function executeToolCallGroups(
           await settle(index, entry, outcome);
         }
       } catch (error) {
+        fatal = mergeToolExecutionFailure(fatal, error);
         // Pre-start completions retain admission; committed validation rejections do not.
         batch.lifecycle?.releaseSkippedCalls?.([
           ...admittedIds(
@@ -707,7 +712,6 @@ async function executeToolCallGroups(
         ]);
         throw error;
       }
-      fatal = launched?.rejected ? { error: launched.rejected.error } : undefined;
       const skippedIndex =
         steeringMessages.length > 0 ? 0 : (launched?.rejected?.index ?? entries.length);
       if (steeringMessages.length > 0) {
@@ -729,7 +733,7 @@ async function executeToolCallGroups(
       }
       for (let index = skippedIndex; index < entries.length; index++) {
         const entry = entries[index];
-        if (!entry || !("kind" in entry) || startedIndices.has(index)) {
+        if (!entry || !("kind" in entry) || startedIndices.has(index) || ordered[index]) {
           continue;
         }
         // A sequential admission failure retains preparation until its synthetic
@@ -741,6 +745,7 @@ async function executeToolCallGroups(
           reason: fatal ? "admission" : "steering",
           args: entry.execution.args,
           startEmitted: true,
+          hideFromChannelProgress: hidesToolCallFromChannelProgress(batch, entry.toolCall),
         });
       }
       if (launched) {
@@ -749,15 +754,12 @@ async function executeToolCallGroups(
           started.map(async ({ index, entry, outcome }) => settle(index, entry, await outcome)),
         );
         started = [];
-        for (const result of settled) {
-          if (result.status === "rejected" && !fatal) {
-            fatal = { error: result.reason };
-            if (cursor < toolCalls.length) {
-              batch.lifecycle?.releaseSkippedCalls?.(
-                admittedIds(toolCalls.slice(cursor), batch.validated),
-              );
-            }
-          }
+        const firstFailure = !fatal;
+        fatal = mergeRejectedToolOutcomes(fatal, settled);
+        if (firstFailure && fatal && cursor < toolCalls.length) {
+          batch.lifecycle?.releaseSkippedCalls?.(
+            admittedIds(toolCalls.slice(cursor), batch.validated),
+          );
         }
       }
       if (batch.lifecycle?.observeOutcome) {
@@ -783,23 +785,23 @@ async function executeToolCallGroups(
           }
         }
       } catch (error) {
-        if (!fatal && steeringMessages.length === 0 && cursor < toolCalls.length) {
+        const releaseTail = !fatal && steeringMessages.length === 0 && cursor < toolCalls.length;
+        fatal = mergeToolExecutionFailure(fatal, error);
+        if (releaseTail) {
           batch.lifecycle?.releaseSkippedCalls?.(
             admittedIds(toolCalls.slice(cursor), batch.validated),
           );
         }
         throw error;
       }
+    } catch (error) {
+      thrown = mergeToolExecutionFailure(fatal, error);
     } finally {
       // A local persistence failure cannot release another accepted tool while it still runs.
-      if (started.length > 0) {
-        await Promise.allSettled(started.map(({ outcome }) => outcome));
-      }
-      for (const entry of entries) {
-        if ("kind" in entry) {
-          entry.execution.dispose();
-        }
-      }
+      thrown = (await drainToolCallGroup(started, entries, thrown ?? fatal)) ?? thrown;
+    }
+    if (thrown) {
+      throw thrown.error;
     }
     if (intervention || steeringMessages.length > 0 || fatal || batch.signal?.aborted) {
       break;
@@ -830,14 +832,21 @@ async function executeToolCallGroups(
     steeringMessages = Array.isArray(steering) ? steering : await steering;
   }
   const skippedReason = fatal ? "admission" : steeringMessages.length > 0 ? "steering" : undefined;
-  for (; cursor < toolCalls.length; cursor++) {
-    const toolCall = toolCalls[cursor];
-    if (!toolCall) {
-      continue;
+  try {
+    for (; cursor < toolCalls.length; cursor++) {
+      const toolCall = toolCalls[cursor];
+      if (!toolCall) {
+        continue;
+      }
+      const finalized = await completeUnstartedToolCall(batch, toolCall, {
+        reason: skippedReason,
+        hideFromChannelProgress: hidesToolCallFromChannelProgress(batch, toolCall),
+      });
+      messages.push(await emitToolResultMessage(finalized, batch.emit));
+      finalizedCalls.push(finalized);
     }
-    const finalized = await completeUnstartedToolCall(batch, toolCall, { reason: skippedReason });
-    messages.push(await emitToolResultMessage(finalized, batch.emit));
-    finalizedCalls.push(finalized);
+  } catch (error) {
+    throw mergeToolExecutionFailure(fatal, error).error;
   }
 
   return {
@@ -1084,45 +1093,6 @@ async function completeToolLoopInterventionBatch(
     terminateRun: params.terminal,
     intervention: params.intervention,
   };
-}
-
-async function completeUnstartedToolCall(
-  batch: ToolBatchContext,
-  toolCall: AgentToolCall,
-  options: {
-    args?: unknown;
-    reason?: "admission" | "steering";
-    startEmitted?: boolean;
-  } = {},
-): Promise<FinalizedToolCallOutcome> {
-  const hideFromChannelProgress = hidesToolCallFromChannelProgress(batch, toolCall);
-  if (!options.startEmitted) {
-    await emitToolExecutionStart(batch, toolCall, hideFromChannelProgress);
-  }
-  const finalized = await finalizeToolCallOutcome(
-    batch,
-    {
-      toolCall,
-      result: createErrorToolResult(
-        options.reason === "admission"
-          ? TOOL_ADMISSION_FAILURE_MESSAGE
-          : options.reason === "steering"
-            ? STEERING_TOOL_SKIP_MESSAGE
-            : "Operation aborted",
-        options.reason === "admission"
-          ? TOOL_ADMISSION_FAILURE_DETAILS
-          : options.reason === "steering"
-            ? { status: "skipped", deniedReason: "steering" }
-            : undefined,
-      ),
-      isError: true,
-      executionStarted: false,
-      ...(hideFromChannelProgress ? { hideFromChannelProgress: true } : {}),
-    },
-    "args" in options ? options.args : toolCall.arguments,
-  );
-  await emitToolExecutionEnd(finalized, batch);
-  return finalized;
 }
 
 /* oxlint-disable max-lines -- TODO: split this grandfathered oversized file. */

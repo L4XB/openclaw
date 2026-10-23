@@ -1,6 +1,11 @@
 import type { AssistantMessage } from "@openclaw/llm-core";
 import { coerceErrorMessage } from "@openclaw/normalization-core/error-coercion";
 import type { ExecutedToolCallOutcome, PreparedToolCall } from "./agent-loop-tool-execution.js";
+import {
+  emitToolExecutionEnd,
+  emitToolExecutionStart,
+  type AgentEventSink,
+} from "./agent-stream-response.js";
 import { ToolArgumentValidationError } from "./errors.js";
 import {
   appendToolLoopWarning,
@@ -218,4 +223,51 @@ export function createErrorToolResult(
     content: [{ type: "text", text: message }],
     details,
   };
+}
+
+const STEERING_TOOL_SKIP_MESSAGE = "Skipped to process an incoming message.";
+const TOOL_ADMISSION_FAILURE_MESSAGE = "Tool execution was blocked before launch.";
+const TOOL_ADMISSION_FAILURE_DETAILS = {
+  status: "blocked",
+  deniedReason: "tool-admission",
+} as const;
+
+export async function completeUnstartedToolCall(
+  batch: ToolOutcomeContext & { emit: AgentEventSink },
+  toolCall: AgentToolCall,
+  options: {
+    args?: unknown;
+    reason?: "admission" | "steering";
+    startEmitted?: boolean;
+    hideFromChannelProgress?: boolean;
+  } = {},
+): Promise<FinalizedToolCallOutcome> {
+  const { hideFromChannelProgress = false } = options;
+  if (!options.startEmitted) {
+    await emitToolExecutionStart(batch, toolCall, hideFromChannelProgress);
+  }
+  const finalized = await finalizeToolCallOutcome(
+    batch,
+    {
+      toolCall,
+      result: createErrorToolResult(
+        options.reason === "admission"
+          ? TOOL_ADMISSION_FAILURE_MESSAGE
+          : options.reason === "steering"
+            ? STEERING_TOOL_SKIP_MESSAGE
+            : "Operation aborted",
+        options.reason === "admission"
+          ? TOOL_ADMISSION_FAILURE_DETAILS
+          : options.reason === "steering"
+            ? { status: "skipped", deniedReason: "steering" }
+            : undefined,
+      ),
+      isError: true,
+      executionStarted: false,
+      ...(hideFromChannelProgress ? { hideFromChannelProgress: true } : {}),
+    },
+    "args" in options ? options.args : toolCall.arguments,
+  );
+  await emitToolExecutionEnd(finalized, batch);
+  return finalized;
 }

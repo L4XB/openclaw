@@ -8,9 +8,11 @@ import { useAutoCleanupTempDirTracker } from "../../test/helpers/temp-dir.js";
 import { createSessionActorFactory } from "../config/sessions/session-actor-durable.js";
 import * as backoff from "../infra/backoff.js";
 import { formatErrorMessageWithCode } from "../infra/errors.js";
+import { classifyGatewayStorageFailure } from "../infra/sqlite-error-diagnostics.js";
 import {
   hasSqliteWorkerOutcomeUnknown,
   isSqliteWorkerError,
+  SqliteWorkerError,
   type SqliteWorkerExecutionAuthority,
 } from "../infra/sqlite-worker-contract.js";
 import {
@@ -489,6 +491,37 @@ it("surfaces the native cleanup cause while the close still fails, then recovers
   expect(readAgentDatabaseExecutionAuthority(authority!)).toBe(true);
   expect(readAgentDatabaseExecutionAuthority(original)).toBe(false);
   await recovered.release();
+});
+
+it("keeps unavailable cleanup failures outside retry handling while preserving their primary outcome", async () => {
+  const execution = capture(makeEnv());
+  await execution.prepare(source);
+  const primary = new SqliteWorkerError("synthetic unavailable operation", "unavailable");
+  const operation = vi.fn(async (scope: AgentDatabaseExecutionScope) => {
+    await scope
+      .execute({ type: "session.entry.read", input: { sessionKeys: [fault.marker] } })
+      .catch(() => {
+        throw primary;
+      });
+  });
+  Atomics.store(faultState, 0, 1);
+  try {
+    const failure: unknown = await execution
+      .runExisting(source, operation)
+      .catch((error: unknown) => error);
+    expect(operation).toHaveBeenCalledOnce();
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).toMatchObject({
+      cause: expect.objectContaining({ cause: primary, errors: [primary, expect.any(Error)] }),
+    });
+    expect(classifyGatewayStorageFailure(failure)).toBe("unavailable");
+    expect(hasSqliteWorkerOutcomeUnknown(failure)).toBe(false);
+    expect(isSqliteWorkerError(failure, "unavailable")).toBe(false);
+    expect(isSqliteWorkerError(primary, "unavailable")).toBe(true);
+  } finally {
+    Atomics.store(faultState, 0, 0);
+    await execution.release();
+  }
 });
 
 it("keeps another agent's admitted database usable after a deleted agent refuses preparation", async () => {

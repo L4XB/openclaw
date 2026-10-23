@@ -18,6 +18,7 @@ export function errorShapeFromError(
   opts?: Parameters<typeof errorShape>[2] & { message?: string },
 ) {
   const { message, ...metadata } = opts ?? {};
+  const outcomeUnknown = hasSqliteWorkerOutcomeUnknown(error);
   const candidates = collectNestedErrorCandidates(error);
   const ended = candidates.find((candidate) => candidate instanceof IncognitoSessionEndedError);
   const storageFailure = classifyGatewayStorageFailure(error);
@@ -40,13 +41,20 @@ export function errorShapeFromError(
         : storageMessage
           ? errorShape(ErrorCodes.UNAVAILABLE, storageMessage, {
               ...metadata,
-              retryable:
-                (storageFailure === "SQLITE_FULL" || storageFailure === "unavailable") &&
-                !hasSqliteWorkerOutcomeUnknown(error) &&
-                metadata.retryable !== false,
+              ...(storageFailure === "unavailable" && !outcomeUnknown
+                ? {}
+                : {
+                    retryable:
+                      storageFailure === "SQLITE_FULL" &&
+                      !outcomeUnknown &&
+                      metadata.retryable !== false,
+                  }),
               details: { code: storageFailure },
             })
           : errorShape(code, message ?? formatErrorMessageWithCode(error), metadata);
+  if (outcomeUnknown) {
+    shape.retryable = false;
+  }
   // Native in-process callers need the original typed failure; it must never
   // become part of the wire response or serialized dedupe payload.
   if (error instanceof Error) {

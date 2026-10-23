@@ -6,6 +6,46 @@ import { SqliteWorkerError, wrapSqliteWorkerError } from "../infra/sqlite-worker
 import { IncognitoSessionEndedError } from "../state/incognito-session-error.js";
 import { errorShapeFromError } from "./error-shape.js";
 
+it.each([false, true])(
+  "fences an uncertain sibling at the wire boundary (contention: %s)",
+  (contention) => {
+    const primary = Object.assign(
+      new Error("PRIVATE_PUBLICATION"),
+      contention ? { code: "SQLITE_BUSY" } : {},
+    );
+    const unknown = new SqliteWorkerError("PRIVATE_UNCONFIRMED", "outcome-unknown");
+    const failure = new AggregateError([primary, unknown], primary.message, { cause: primary });
+    const packet = JSON.stringify(
+      errorShapeFromError(ErrorCodes.INVALID_REQUEST, failure, { retryable: true }),
+    );
+    const wire: unknown = JSON.parse(packet);
+    expect(wire).toMatchObject({ retryable: false });
+    if (!contention) {
+      expect(wire).toMatchObject({
+        code: ErrorCodes.UNAVAILABLE,
+        details: { code: "session_actor_reconciliation" },
+        message: expect.stringMatching(/check.*history/i),
+      });
+    }
+    expect(wire).not.toHaveProperty("cause");
+  },
+);
+
+it("preserves omitted retry authority when rendering a canonical unavailable outcome", () => {
+  const error = new SqliteWorkerError("PRIVATE_ROLLBACK", "unavailable");
+  const result = errorShapeFromError(ErrorCodes.UNAVAILABLE, error, {
+    message: "PRIVATE_DISPATCH_FAILURE",
+  });
+  expect(result).toMatchObject({
+    code: ErrorCodes.UNAVAILABLE,
+    details: { code: "unavailable" },
+  });
+  expect(result).not.toHaveProperty("retryable");
+  expect(result.message).toMatch(/connection|database/i);
+  expect(result.message).toMatch(/retry|try again/i);
+  expect(result.message).not.toContain("PRIVATE_");
+});
+
 it.each(["direct", "cleanup", "uncertain-cleanup", "retry-refused"])(
   "renders a canonical unavailable outcome without changing retry authority (%s)",
   (scenario) => {

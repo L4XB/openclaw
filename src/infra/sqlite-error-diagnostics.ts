@@ -52,12 +52,16 @@ export function isLocalStorageOutcomeError(error: unknown): boolean {
 export function classifyGatewayStorageFailure(error: unknown): GatewayStorageFailure | undefined {
   let primaryError = error;
   let outcomeUnknown = false;
+  let unavailable: GatewayStorageFailure | undefined;
   const seen = new Set<unknown>();
   // Cleanup envelopes explicitly identify the operation's primary failure.
   // Secondary cleanup diagnostics must not replace its user-facing outcome.
   for (let current = error; current instanceof Error && !seen.has(current);) {
     seen.add(current);
     outcomeUnknown ||= isSqliteWorkerError(current, "outcome-unknown");
+    if (isSqliteWorkerError(current, "unavailable")) {
+      unavailable = "unavailable";
+    }
     const cause = readOwnErrorDataProperty(current, "cause");
     if (current instanceof AggregateError) {
       const errors = readOwnErrorDataProperty(current, "errors");
@@ -83,11 +87,19 @@ export function classifyGatewayStorageFailure(error: unknown): GatewayStorageFai
       reconciliation = failure;
     } else if (failure === "57014") {
       cancellation = failure;
+    } else if (failure === "unavailable") {
+      unavailable = failure;
     } else if (failure) {
       return failure;
     }
   }
-  return reconciliation ?? cancellation;
+  // Native storage diagnostics can refine the guidance without promoting a known rollback.
+  return (
+    unavailable ??
+    reconciliation ??
+    cancellation ??
+    (hasSqliteWorkerOutcomeUnknown(error) ? "session_actor_reconciliation" : undefined)
+  );
 }
 
 function classifyStorageFailure(error: unknown): GatewayStorageFailure | undefined {

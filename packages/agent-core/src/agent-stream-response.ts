@@ -24,6 +24,7 @@ import {
   runAgentCoreStream,
 } from "./runtime-deps.js";
 import { createStreamSteering } from "./stream-steering.js";
+import { mergeToolExecutionFailure } from "./tool-batch-completion.js";
 import type { FinalizedToolCallOutcome } from "./tool-call-outcome.js";
 import { resolveAgentAssistantTurnId } from "./tool-execution-context.js";
 import { normalizeCoreContextMessages } from "./turn-interruption.js";
@@ -292,12 +293,13 @@ export async function streamAgentResponse(
         }
       })
       .catch((error: unknown) => {
-        executionFailure ??= { error };
+        executionFailure = mergeToolExecutionFailure(executionFailure, error);
         executionAbort.abort(error);
       })
       .finally(releaseAdmission);
     executions = Promise.all([previousExecutions, execution]).then(() => {});
   };
+  let responseFailure: ExecutedToolCallBatch["fatal"];
   try {
     const stream = streamFunction(config.model, llmContext, {
       ...config,
@@ -511,9 +513,37 @@ export async function streamAgentResponse(
       },
       runtime,
     );
+  } catch (error) {
+    responseFailure = { error };
+    throw error;
   } finally {
     executionAbort.abort(new Error("Model response closed"));
     await executions;
-    await steering.finish();
+    if (executionFailure) {
+      responseFailure = mergeToolExecutionFailure(responseFailure, executionFailure.error);
+    }
+    if (responseFailure) {
+      for (const batch of batches) {
+        if (batch.fatal) {
+          responseFailure = mergeToolExecutionFailure(responseFailure, batch.fatal.error);
+        }
+      }
+    }
+    try {
+      await steering.finish();
+    } catch (error) {
+      if (!responseFailure) {
+        for (const batch of batches) {
+          if (batch.fatal) {
+            responseFailure = mergeToolExecutionFailure(responseFailure, batch.fatal.error);
+          }
+        }
+      }
+      responseFailure = mergeToolExecutionFailure(responseFailure, error);
+    }
+    if (responseFailure) {
+      // oxlint-disable-next-line eslint/no-unsafe-finally -- Rethrow the primary and drained failures together.
+      throw responseFailure.error;
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
+import { decodePostgresError } from "./postgres-sync/protocol.js";
 import {
   classifyGatewayStorageFailure,
   isLocalStorageOutcomeError,
@@ -55,6 +56,27 @@ describe("worker failure causes", () => {
 });
 
 describe("worker outcome classification", () => {
+  it.each([false, true])(
+    "keeps a canonical rollback outside terminal cancellation handling (cleanup: %s)",
+    (cleanup) => {
+      const cancellation = decodePostgresError({
+        name: "error",
+        message: "PRIVATE_CANCELLED_STATEMENT",
+        code: "57014",
+      });
+      const failure = Object.assign(new SqliteWorkerError("PRIVATE_ROLLBACK", "unavailable"), {
+        cause: cleanup
+          ? new AggregateError([cancellation, new Error("PRIVATE_CLEANUP")], "PRIVATE_MULTI", {
+              cause: cancellation,
+            })
+          : cancellation,
+      });
+      expect(classifyGatewayStorageFailure(failure)).toBe("unavailable");
+      expect(isLocalStorageOutcomeError(failure)).toBe(false);
+      expect(isSqliteWorkerError(failure, "unavailable")).toBe(true);
+    },
+  );
+
   it("presents canonical unavailability without changing execution classification", () => {
     const unavailable = new SqliteWorkerError("PRIVATE_ROLLBACK", "unavailable");
     expect(classifyGatewayStorageFailure(unavailable)).toBe("unavailable");
