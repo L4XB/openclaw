@@ -240,8 +240,8 @@ export async function createDurableQuestionGateway(
       discovery: { mdns: { mode: "off" } },
       agents: {
         defaults: {
-          heartbeat: { every: "0m" },
           model: { primary: model.modelRef },
+          modelPolicy: { allow: [model.modelRef] },
           models: {
             [model.modelRef]: {
               agentRuntime: { id: "openclaw" },
@@ -252,6 +252,7 @@ export async function createDurableQuestionGateway(
       },
       models: {
         mode: "merge",
+        catalogRefresh: { enabled: false },
         providers: {
           [model.providerId]: {
             ...model.config,
@@ -260,7 +261,7 @@ export async function createDurableQuestionGateway(
           },
         },
       },
-      tools: { codeMode: false, exec: { host: "gateway", security: "full", ask: "off" } },
+      tools: { codeMode: false, exec: { host: "gateway", mode: "full" } },
       ...options?.config,
     },
     env: {
