@@ -923,6 +923,7 @@ export const databaseWorkerCoreTestFiles = [
   "src/state/openclaw-agent-participants-migration.test.ts",
   "src/state/openclaw-agent-trajectory-storage-migration.test.ts",
   "src/state/openclaw-agent-memory-revision-migration.test.ts",
+  "src/state/openclaw-agent-vector-decoder-migration.test.ts",
   "src/state/openclaw-agent-write-layout-migration.test.ts",
   "src/state/openclaw-agent-index-retirement-migration.test.ts",
   "src/state/openclaw-state-db-write-index-migration.test.ts",
@@ -1375,6 +1376,7 @@ export const databaseWorkerCoreTestFiles = [
   "src/infra/database-engine/plugin-lifecycle-lease.postgres.test.ts",
   "src/infra/database-engine/session-path-alias.conformance.test.ts",
   "src/infra/database-engine/session-archive-alias.conformance.test.ts",
+  "src/infra/database-engine/outcome-surfaces.postgres.test.ts",
 ];
 
 const databaseWorkerCoreTestFileSet = new Set(databaseWorkerCoreTestFiles);
