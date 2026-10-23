@@ -1471,6 +1471,15 @@ def public_dm_topic_record(record):
     ) if key in record}
 
 
+def resolve_dm_topic_chat(driver, identity):
+    chat_id = driver.resolve_chat(f"@{identity['sutUsername']}")
+    if str(chat_id) != identity["sutBotId"]:
+        raise DriverError("DM topic target is not the leased SUT.")
+    # Refresh native bot capabilities after the Mini App changed them outside TDLib.
+    driver.client.request({"@type": "getUserFullInfo", "user_id": int(identity["sutBotId"])})
+    return chat_id
+
+
 def prepare_dm_topic(driver, manifest_path):
     identity = forum_identity(driver, True)
     if manifest_path.exists():
@@ -1478,16 +1487,20 @@ def prepare_dm_topic(driver, manifest_path):
     record = {**identity, "status": "enabling", "topicTitle": f"OpenClaw QA DM {secrets.token_hex(6)}"}
     write_json_private(manifest_path, record)
     record["threadedMode"] = set_bot_threaded_mode(driver, identity, True)
-    chat = driver.client.request({
-        "@type": "createPrivateChat", "user_id": int(identity["sutBotId"]), "force": True,
-    })
-    record.update(chatId=str(chat["id"]), status="creating-topic")
+    chat_id = resolve_dm_topic_chat(driver, identity)
+    record.update(chatId=str(chat_id), status="creating-topic")
     write_json_private(manifest_path, record)
-    topic = driver.client.request({
-        "@type": "createForumTopic", "chat_id": chat["id"], "name": record["topicTitle"],
-        "is_name_implicit": False,
-        "icon": {"@type": "forumTopicIcon", "color": 7322096, "custom_emoji_id": "0"},
-    })
+    try:
+        topic = driver.client.request({
+            "@type": "createForumTopic", "chat_id": chat_id, "name": record["topicTitle"],
+            "is_name_implicit": False,
+            "icon": {"@type": "forumTopicIcon", "color": 0x6FB9F0, "custom_emoji_id": 0},
+        })
+    except TdRequestError as error:
+        if error.tdlib_code == 400:
+            record.update(status="creation-rejected", creationRejected=True)
+            write_json_private(manifest_path, record)
+        raise
     record.update(ok=True, status="ready", forumTopicId=int(topic["forum_topic_id"]))
     write_json_private(manifest_path, record)
     return public_dm_topic_record(record)
@@ -1506,11 +1519,13 @@ def cleanup_dm_topic(driver, manifest_path):
     record.update(ok=False, status="restoring")
     write_json_private(manifest_path, record)
     try:
-        if record.get("chatId") and not record.get("topicDeleted"):
+        if record.get("chatId") and not record.get("topicDeleted") and not record.get("creationRejected"):
             if resuming:
                 # A previous cleanup can have disabled topics before its deletion was confirmed.
                 record["threadedMode"] = set_bot_threaded_mode(driver, identity, True)
                 write_json_private(manifest_path, record)
+            if str(resolve_dm_topic_chat(driver, identity)) != record["chatId"]:
+                raise DriverError("DM topic target changed during cleanup.")
             topic_id = record.get("forumTopicId")
             if topic_id is None:
                 listed = driver.client.request({

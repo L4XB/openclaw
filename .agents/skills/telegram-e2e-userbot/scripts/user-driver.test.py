@@ -48,9 +48,13 @@ class DmTopicTest(unittest.TestCase):
             kind = payload["@type"]
             if kind == "getMe":
                 return {"id": 123}
-            if kind == "createPrivateChat":
+            if kind == "searchPublicChat":
                 return {"id": 42}
+            if kind == "getUserFullInfo":
+                return {"@type": "userFullInfo"}
             if kind == "createForumTopic":
+                if fail_create == "rejected":
+                    raise driver.TdRequestError("Creation rejected", tdlib_code=400)
                 if fail_create:
                     raise driver.DriverError("Timed out after creation")
                 return {"forum_topic_id": 777}
@@ -61,10 +65,11 @@ class DmTopicTest(unittest.TestCase):
                     raise driver.DriverError("Deletion denied")
                 return {"@type": "ok"}
             raise AssertionError(f"Unexpected native method: {kind}")
-        return SimpleNamespace(
-            config={"testDc": True, "testerUserId": "123"}, bot_config={},
-            client=SimpleNamespace(request=Mock(side_effect=request)),
-        )
+        instance = driver.UserDriver.__new__(driver.UserDriver)
+        instance.config = {"testDc": True, "testerUserId": "123"}
+        instance.bot_config = {}
+        instance.client = SimpleNamespace(request=Mock(side_effect=request))
+        return instance
 
     def test_mini_app_url_is_private_and_removed_even_when_the_browser_fails(self):
         secret_url = "https://example.invalid/?tgWebAppData=synthetic-private-session"
@@ -169,6 +174,21 @@ class DmTopicTest(unittest.TestCase):
             deletes = [call for call in instance.client.request.call_args_list
                        if call.args[0]["@type"] == "deleteForumTopic"]
             self.assertEqual(len(deletes), 1)
+
+    def test_definite_creation_rejection_restores_mode_without_searching_for_a_nonexistent_topic(self):
+        instance = self.instance(fail_create="rejected")
+        mode = Mock(side_effect=lambda _driver, _identity, enabled: {"before": not enabled, "after": enabled})
+        with tempfile.TemporaryDirectory() as root, \
+             patch.object(driver, "resolve_sut", return_value={"id": "42", "username": "leased_bot"}), \
+             patch.object(driver, "set_bot_threaded_mode", mode):
+            manifest = Path(root) / "dm-topic.json"
+            with self.assertRaisesRegex(driver.TdRequestError, "Creation rejected"):
+                driver.prepare_dm_topic(instance, manifest)
+            self.assertEqual(driver.cleanup_dm_topic(instance, manifest)["status"], "restored")
+            methods = [call.args[0]["@type"] for call in instance.client.request.call_args_list]
+            self.assertNotIn("getForumTopics", methods)
+            self.assertNotIn("deleteForumTopic", methods)
+            self.assertFalse(mode.call_args.args[2])
 
     def test_uncertain_creation_reconciles_only_its_recorded_topic(self):
         instance = self.instance(fail_create=True)
