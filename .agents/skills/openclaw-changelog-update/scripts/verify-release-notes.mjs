@@ -1000,7 +1000,7 @@ export function collectReleaseProvenanceOverrides(activeCommits, releaseProvenan
   for (const commit of activeCommits) {
     for (const line of commit.body
       .split("\n")
-      .filter((line) => /^Release provenance:/i.test(line))) {
+      .filter((candidateLine) => /^Release provenance:/i.test(candidateLine))) {
       // Recover consolidated origin metadata without rewriting pushed history, but
       // only when the containing commit's explicit mapping preserves every PR.
       if (
@@ -2641,11 +2641,7 @@ function main() {
       `release notes target ${options.target} is not reachable from canonical release branch ${options.releaseBranch}; generate notes from that branch's frozen tip`,
     );
   }
-  const releaseSource = loadOrInitializeReleaseChangelog(
-    rootDir,
-    options.version,
-    options.writeLedger,
-  );
+  const releaseSource = loadReleaseChangelog({ rootDir, version: options.version });
   if (releaseSource.format !== "initial") {
     fail("docs-mirrored release notes must be verified by the docs-publication workflow");
   }

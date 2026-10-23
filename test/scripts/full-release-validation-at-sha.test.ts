@@ -836,7 +836,7 @@ describe("full-release-validation-at-sha", () => {
       const calls = fixture.readCalls(fixture.ghCallsPath);
       expect(
         calls.filter((args) => ghApiEndpoint(args).endsWith("/actions/workflows/17/runs")),
-      ).toHaveLength(3);
+      ).toHaveLength(8);
       expect(
         calls.filter((args) => ghApiEndpoint(args).endsWith("/actions/runs/123")),
       ).toHaveLength(4);
@@ -858,7 +858,7 @@ describe("full-release-validation-at-sha", () => {
       const calls = fixture.readCalls(fixture.ghCallsPath);
       expect(
         calls.filter((args) => ghApiEndpoint(args).endsWith("/actions/workflows/17/runs")),
-      ).toHaveLength(4);
+      ).toHaveLength(9);
     } finally {
       fixture.cleanup();
     }
@@ -1484,7 +1484,9 @@ describe("full-release-validation-at-sha", () => {
     expect(result.stderr).toContain("dispatch=unknown");
     expect(result.stdout).not.toContain("ok release evidence");
     const calls = fixture.calls();
-    expect(calls.filter(isWorkflowDispatch)).toHaveLength(1);
+    expect(calls.filter(isWorkflowDispatch)).toHaveLength(
+      options.inventoryError || options.malformedInventory ? 0 : 1,
+    );
     expect(calls.filter((args) => ghApiMethod(args) === "DELETE")).toEqual([]);
     if (options.duplicateOnSecondPage && !options.incompletePagination) {
       expect(calls.some((args) => ghField(args, "page") === "2")).toBe(true);

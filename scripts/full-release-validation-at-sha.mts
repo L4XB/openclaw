@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Dispatches full release validation against a temporary SHA-pinned branch.
 import {
   execFileSync,
   spawnSync,
@@ -37,7 +38,6 @@ import {
   readDispatchRecord,
   retainDispatchRecord,
   dispatchInputsDigest,
-  formatDispatchSelection,
   observeQualificationAdmission,
   qualifyAdmission,
   type DispatchInputs,
@@ -47,10 +47,8 @@ import {
   type QualificationAdmissionDispatch,
 } from "./lib/full-release-dispatch-request.mts";
 import { execPlainGh } from "./lib/plain-gh.mjs";
-import { validateCandidateChangelog } from "./lib/release-candidate-changelog.mts";
 import { parseReleaseContextRef, resolveReleaseContextIdentity } from "./lib/release-context.mjs";
 import { resolveQualificationBaselines } from "./lib/release-upgrade-baseline.mjs";
-import { classifyReleaseTrain, parseReleaseVersion } from "./lib/release-version.mjs";
 import { validatePackageSourceRef } from "./package-source-preflight.mjs";
 import {
   validateCandidateActorPermissionWithGithub,
@@ -71,7 +69,7 @@ const RELEASE_EVIDENCE_VERIFIER_PATHS = [
 ];
 const GH_READ_TIMEOUT_MS = 60_000;
 export const FULL_RELEASE_WAIT_TIMEOUT_MINUTES = 720;
-const FULL_RELEASE_GITHUB_POLL_INTERVAL_MS = 2 * 60_000;
+export const FULL_RELEASE_GITHUB_POLL_INTERVAL_MS = 2 * 60_000;
 const FULL_RELEASE_PROGRESS_INTERVAL_MS = 15 * 60_000;
 const FULL_RELEASE_RUN_DISCOVERY_DELAYS_MS = [30_000, 60_000, 120_000];
 // A run can wait in the runner queue before its first job uploads the witness.
@@ -212,8 +210,6 @@ always performs read-only reconciliation. --reconcile-request refuses a missing 
 mutation; after a qualification POST it is observation-only, never a redispatch.
 Retain the artifact until operator cleanup; its loss never proves non-execution.
 Frozen tooling must declare FULL_RELEASE_DISPATCH_WITNESS_CONTRACT=1 before a new request.
-Prints the frozen candidate/tooling, effective profile, group, and soak selection
-before dispatch and when reconciling the retained request.
 
 Preflights the Validation SHA with a bare-SHA fetch into a fresh temporary repository.
 Creates one immutable release-ci/* workflow ref pinned to the exact Tooling SHA,
@@ -621,19 +617,7 @@ export function verifyTargetRef(
   if (!targetRef) {
     return targetSha;
   }
-  let identity: ReturnType<typeof resolveReleaseContextIdentity>;
-  try {
-    identity = resolveReleaseContextIdentity(targetRef, targetVersion);
-  } catch (error) {
-    const context = parseReleaseContextRef(targetRef);
-    const preparation =
-      context?.kind === "release tag"
-        ? `Prepare the candidate from a commit whose package.json version matches ${context.ref}, push that tag, then rerun with its candidate SHA.`
-        : `Update package.json on ${targetRef} to the intended release version, commit and push the release branch, then rerun with the new candidate SHA.`;
-    throw new Error(`${error instanceof Error ? error.message : String(error)} ${preparation}`, {
-      cause: error,
-    });
-  }
+  const identity = resolveReleaseContextIdentity(targetRef, targetVersion);
   if (!identity) {
     throw new Error("Target ref must be a canonical OpenClaw release branch or tag");
   }
@@ -783,10 +767,7 @@ function candidateTrustReason(
       const context = parseReleaseContextRef(contextRef);
       return context?.kind === "release tag" ? [context.ref] : [];
     });
-  if (matchingTags.length > 0) {
-    return "release-tag";
-  }
-  return undefined;
+  return matchingTags.length > 0 ? "release-tag" : undefined;
 }
 
 function preflightCandidateSigningProvenance(
@@ -807,41 +788,13 @@ function preflightCandidateSigningProvenance(
   return actor;
 }
 
-// pnpm release:candidate applies these gates after validation finishes; check
-// them first so an unpublishable candidate never spends a validation run.
-// Extended-stable publication does not use that checklist.
-function validatePublishCandidateChangelog(
+function targetVersionForTarget(
   targetSha: string,
-  targetContextRef: string,
-  targetVersion: string,
-) {
-  const packaged = parseReleaseVersion(targetVersion);
-  if (packaged && classifyReleaseTrain(packaged) === "extended-stable") {
-    return;
-  }
-  const releaseTag =
-    resolveReleaseContextIdentity(targetContextRef, targetVersion)?.releaseTag ??
-    `v${targetVersion}`;
-  try {
-    validateCandidateChangelog({
-      rootDir: process.cwd(),
-      repository: REPOSITORY,
-      tag: releaseTag,
-      targetSha,
-    });
-  } catch (error) {
-    throw new Error(
-      `Candidate ${targetSha} would fail the pnpm release:candidate changelog gates for ${releaseTag}: ${error instanceof Error ? error.message : String(error)}. Fix the release notes or contribution record on the release branch (its recorded target must be reachable from the candidate), then validate the new candidate SHA.`,
-      { cause: error },
-    );
-  }
-  console.log(`Release notes and contribution record pass the ${releaseTag} candidate gates`);
-}
-
-function targetVersionForTarget(targetSha: string): string {
+  readPackageJson: (sha: string) => string = (sha) => run("git", ["show", `${sha}:package.json`]),
+): string {
   let version: unknown;
   try {
-    version = JSON.parse(run("git", ["show", `${targetSha}:package.json`])).version;
+    version = JSON.parse(readPackageJson(targetSha)).version;
   } catch {
     throw new Error(`Could not read package.json from target SHA ${targetSha}`);
   }
@@ -851,11 +804,18 @@ function targetVersionForTarget(targetSha: string): string {
   return version;
 }
 
-export function releaseProfileForVersion(version: string): "beta" | "stable" {
+function releaseProfileForVersion(version: string): "beta" | "stable" {
   if (version.includes("-alpha.")) {
     throw new Error("Alpha releases are retired; use a beta prerelease instead.");
   }
   return /-beta\.[1-9][0-9]*$/u.test(version) ? "beta" : "stable";
+}
+
+export function releaseProfileForTarget(
+  targetSha: string,
+  readPackageJson: (sha: string) => string = (sha) => run("git", ["show", `${sha}:package.json`]),
+): "beta" | "stable" {
+  return releaseProfileForVersion(targetVersionForTarget(targetSha, readPackageJson));
 }
 
 export function verifyTrustedWorkflowRef(
@@ -973,31 +933,6 @@ function warnCandidateToolingLag(candidateSha: string) {
       ),
     );
   }
-}
-
-function assertAdmissionContract(admissionWorkflowSha: string) {
-  const workflow = parseYaml(
-    run("git", ["show", `${admissionWorkflowSha}:.github/workflows/${ADMISSION_WORKFLOW}`]),
-  );
-  requireDispatch(
-    workflow?.env?.RELEASE_QUALIFICATION_ADMISSION_CONTRACT === "1",
-    "Selected P lacks qualification admission; update P independently without changing C/Q",
-  );
-}
-
-// Main routinely advances between P selection and the admission POST. A newer
-// tip replaces P only when it is trusted main, descends from the selected P,
-// and still declares the admission contract.
-function verifyMainAdmissionAdvance(previousSha: string, currentSha: string) {
-  requireDispatch(
-    resolveTrustedWorkflowSha(currentSha, "main") === currentSha,
-    `Main tip ${currentSha} did not resolve to itself`,
-  );
-  requireDispatch(
-    runStatus("git", ["merge-base", "--is-ancestor", previousSha, currentSha]).status === 0,
-    `Main tip ${currentSha} does not descend from selected P ${previousSha}`,
-  );
-  assertAdmissionContract(currentSha);
 }
 
 function requireDispatch(condition: unknown, message: string): asserts condition {
@@ -1511,7 +1446,6 @@ const qualificationDispatchClient = {
   readApi: readGhApi,
   postApi: (args: string[]) => runGh(args, { stdio: ["ignore", "pipe", "pipe"] }),
   httpStatus: (response: string) => parseGhHttpResponse(response).status,
-  verifyMainAdvance: verifyMainAdmissionAdvance,
 };
 
 async function reopenDispatch(path: string, args: ReturnType<typeof parseArgs>, argv: string[]) {
@@ -1548,7 +1482,6 @@ async function reopenDispatch(path: string, args: ReturnType<typeof parseArgs>, 
       ),
     "Reopen arguments conflict with the retained request",
   );
-  console.log(formatDispatchSelection(request));
   try {
     if (record.admission && record.phase === "prepared") {
       const observed = observeQualificationAdmission(record, qualificationDispatchClient);
@@ -1623,7 +1556,15 @@ export function validateReleaseDecisionPayload(
     workflowSha: string;
   },
 ) {
-  return validateReleaseStateArtifact(payload, expected, "decision");
+  return validateReleaseStateArtifact(
+    payload,
+    {
+      parentRunAttempt: expected.parentRunAttempt,
+      parentRunId: expected.parentRunId,
+      workflowSha: expected.workflowSha,
+    },
+    "decision",
+  );
 }
 
 export function releaseDecisionStopsForeground(state: unknown) {
@@ -2096,7 +2037,13 @@ async function main() {
     ? resolveTrustedWorkflowSha(args.admissionWorkflowSha, args.admissionWorkflowRef)
     : undefined;
   if (admissionWorkflowSha) {
-    assertAdmissionContract(admissionWorkflowSha);
+    const workflow = parseYaml(
+      run("git", ["show", `${admissionWorkflowSha}:.github/workflows/${ADMISSION_WORKFLOW}`]),
+    );
+    requireDispatch(
+      workflow?.env?.RELEASE_QUALIFICATION_ADMISSION_CONTRACT === "1",
+      "Selected P lacks qualification admission; update P independently without changing C/Q",
+    );
   }
   if (candidateOwned) {
     warnCandidateToolingLag(workflowSha);
@@ -2134,9 +2081,6 @@ async function main() {
   validatePackageSourceRef(targetSha, {
     allowUnreleasedChangelog: args.inputs.allow_unreleased_changelog === "true",
   });
-  if (args.inputs.validation_purpose === "publish") {
-    validatePublishCandidateChangelog(targetSha, targetContextRef, targetVersion);
-  }
   if (trustedWorkflowHarness.contract === "1") {
     args.inputs.reuse_evidence = "false";
   }
@@ -2250,6 +2194,9 @@ async function main() {
   console.log(`Validation SHA: ${targetSha}`);
   console.log(`Tooling SHA: ${workflowSha}`);
   console.log(`Trusted workflow ref: ${args.trustedWorkflowRef}`);
+  console.log(
+    `Frozen validation tuple: candidate=${targetSha} tooling=${workflowSha} rerun_group=${args.inputs.rerun_group}`,
+  );
   console.log(`Temporary workflow ref: ${branch}`);
 
   await executeFrozenDispatch({
@@ -2277,11 +2224,6 @@ async function executeFrozenDispatch(options: {
   const { args, requestPath, workflowSha, branch, admissionWorkflowSha, candidateAuthorityActor } =
     options;
   let { record, selection } = options;
-  console.log(
-    formatDispatchSelection(
-      record?.request ?? { targetSha: String(selection.inputs.ref), workflowSha, ...selection },
-    ),
-  );
   const candidateOwned = args.trustedWorkflowRef === "candidate";
   const remoteBranchRef = `refs/heads/${branch}`;
   let parentRunId: string | undefined;
@@ -2426,12 +2368,16 @@ async function executeFrozenDispatch(options: {
     }
     if (parentRunId) {
       console.log(`Parent run: https://github.com/openclaw/openclaw/actions/runs/${parentRunId}`);
-      waitForWorkflowRun(parentRunId, workflowSha, record);
-      parentConclusion = "success";
+      const completedRun = waitForWorkflowRun(parentRunId, workflowSha, record);
+      parentConclusion = stringValue(completedRun.conclusion);
+      if (parentConclusion !== "success") {
+        throw new Error(
+          `Full Release Validation concluded ${parentConclusion.toLowerCase() || "without a conclusion"}: https://github.com/openclaw/openclaw/actions/runs/${parentRunId}`,
+        );
+      }
       verifyReleaseEvidence(
         parentRunId,
-        // Admission may have advanced P with main before its POST.
-        record?.admission?.workflowSha ?? admissionWorkflowSha ?? workflowSha,
+        admissionWorkflowSha ?? workflowSha,
         candidateOwned ? args.admissionWorkflowRef : args.trustedWorkflowRef,
       );
       evidenceVerified = true;

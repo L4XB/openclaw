@@ -84,26 +84,6 @@ describe("candidate-owned full release dispatch entry point", () => {
     );
     expect(dispatches(f)).toEqual([P]);
   });
-  it("advances main-selected P to a verified descendant before the admission POST", () => {
-    const f = createDispatchFixture({ candidateOwned: true, advanceMainBeforeAdmission: 3 });
-    const result = f.run();
-    expect(result.status, result.stderr).toBe(0);
-    expect(dispatches(f)).toEqual([P, Q]);
-    const advancedP = runGit(f.origin, ["rev-parse", "refs/heads/main"]);
-    expect(advancedP).not.toBe(f.workflowSha);
-    expect(result.stdout.match(/Admission P advanced with main/gu)).toHaveLength(3);
-    const retained = f.record();
-    expect(retained.admission.workflowSha).toBe(advancedP);
-    expect(retained.request.workflowSha).toBe(f.targetSha);
-    const envelope = JSON.parse(
-      expectDefined(f.readPayload().body.inputs.trusted_workflow_json, "dispatched envelope"),
-    );
-    expect(envelope.qualificationAdmission).toMatchObject({
-      workflowSha: advancedP,
-      workflowFullRef: "refs/heads/main",
-    });
-  });
-
   it("refuses main that keeps moving past the admission advance bound", () => {
     const f = createDispatchFixture({ candidateOwned: true, advanceMainBeforeAdmission: 4 });
     const result = f.run();
@@ -479,7 +459,7 @@ describe("candidate-owned full release dispatch entry point", () => {
     expect(record.request.wireInputs).not.toHaveProperty("publication_selection_json");
     expect(record.request.wireInputs).not.toHaveProperty("extension_test_exclude_patterns_json");
     expect(record.request.wireInputs).not.toHaveProperty("known_flaky_jobs_json");
-    expect(Object.keys(fixture.readPayload().body.inputs)).toHaveLength(24);
+    expect(Object.keys(fixture.readPayload().body.inputs)).toHaveLength(25);
     const before = readFileSync(fixture.requestPath());
     const callsBefore = fixture.readCalls(fixture.ghCallsPath).length;
     const reopened = fixture.run(
@@ -520,72 +500,6 @@ describe("candidate-owned full release dispatch entry point", () => {
     );
     expectDispatchFailure(mismatch, "conflict with the retained request");
     expect(readFileSync(fixture.requestPath())).toEqual(before);
-  });
-
-  it("refuses publish qualification when a squash left the contribution record target unreachable", () => {
-    const fixture = createDispatchFixture({
-      candidateOwned: true,
-      unreachableContributionRecord: true,
-    });
-    try {
-      const result = fixture.run([
-        "--workflow-sha",
-        fixture.targetSha,
-        "-f",
-        "validation_purpose=publish",
-        "-f",
-        `publication_selection_json=${JSON.stringify({
-          route: "normal",
-          npmDistTag: "beta",
-          publishOpenclawNpm: true,
-          pluginPublishScope: "all-publishable",
-          plugins: [],
-        })}`,
-      ]);
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        `Candidate ${fixture.targetSha} would fail the pnpm release:candidate changelog gates for v2026.8.1`,
-      );
-      expect(result.stderr).toMatch(
-        new RegExp(
-          `contribution record target [0-9a-f]{40} is not reachable from release tag ${fixture.targetSha}`,
-          "u",
-        ),
-      );
-      expect(
-        fixture.readCalls(fixture.ghCallsPath).filter((args) => ghApiMethod(args) !== "GET"),
-      ).toEqual([]);
-      expect(dispatches(fixture)).toEqual([]);
-    } finally {
-      fixture.cleanup();
-    }
-  });
-
-  it("refuses publish qualification when the candidate changelog thanks an internal handle", () => {
-    const fixture = createDispatchFixture({
-      candidateOwned: true,
-      releaseNotes: "- Fixes: keep replies threaded. Thanks @steipete.",
-    });
-    try {
-      const result = fixture.run([
-        "--workflow-sha",
-        fixture.targetSha,
-        "-f",
-        "validation_purpose=publish",
-        "-f",
-        `publication_selection_json=${JSON.stringify(publicationSelectionFixture())}`,
-      ]);
-      expectDispatchFailure(
-        result,
-        "Forbidden changelog thanks attribution (pnpm check:changelog-attributions): CHANGELOG.md:3 uses Thanks @steipete. Use verified human GitHub credits",
-      );
-      expect(
-        fixture.readCalls(fixture.ghCallsPath).filter((args) => ghApiMethod(args) !== "GET"),
-      ).toEqual([]);
-      expect(dispatches(fixture)).toEqual([]);
-    } finally {
-      fixture.cleanup();
-    }
   });
 
   it("reopens the original selected-plugin spelling after dispatch canonicalizes order and duplicates", () => {

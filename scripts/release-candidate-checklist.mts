@@ -2104,6 +2104,7 @@ async function main() {
   });
   // Publication may use repaired tooling while the prepared tarball retains its original producer.
   const statePath = join(options.outputDir, RELEASE_CANDIDATE_STATE_FILE);
+  const hasRetainedRequest = existsSync(join(options.outputDir, "frv-request.json"));
   if (options.workflowSha && !options.publishWorkflowRef) {
     if (options.workflowSha !== toolingSha) {
       throw new Error(
