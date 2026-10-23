@@ -7,7 +7,11 @@ import { resolveOpenClawAgentSqlitePath } from "../../state/openclaw-agent-db.pa
 import { captureOpenClawAgentDatabaseExecution } from "../../state/openclaw-agent-execution.js";
 import { executeOpenClawAgentWorkerPublication } from "../../state/openclaw-agent-worker-store.js";
 import type { SessionAccessScope } from "./session-accessor.sqlite-contract.js";
-import { prepareSqliteScope, toDatabaseOptions } from "./session-accessor.sqlite-scope.js";
+import {
+  prepareSqliteScope,
+  resolveSqliteScope,
+  toDatabaseOptions,
+} from "./session-accessor.sqlite-scope.js";
 import { runSessionEntryWorkerOperation } from "./session-entry-patch.js";
 import { SessionQuestionCustodyRetiredError } from "./session-questions-custody-error.js";
 import type {
@@ -32,7 +36,29 @@ export async function executeSessionQuestionOperation(
     throw new Error("Incognito questions remain transient and cannot acquire durable custody.");
   }
   options.assertCurrent();
-  const target = await prepareSqliteScope(options);
+  const requiresCustody =
+    input.kind === "register" ||
+    input.kind === "settle" ||
+    input.kind === "claim" ||
+    input.kind === "finish" ||
+    input.kind === "block";
+  const binding =
+    input.kind === "register"
+      ? input.question.sessionBinding
+      : "expectedQuestion" in input
+        ? input.expectedQuestion?.sessionBinding
+        : undefined;
+  if (requiresCustody && !binding) {
+    throw new SessionQuestionCustodyRetiredError("Captured durable question custody is required.");
+  }
+  // Captured custody owns the physical target; rediscovering its logical alias can
+  // select another pathname or store. The worker checks native identity at commit.
+  const target = binding
+    ? resolveSqliteScope(options, undefined, {
+        agentId: binding.agentId,
+        path: binding.databasePath,
+      })
+    : await prepareSqliteScope(options);
   options.assertCurrent();
   const database = {
     ...toDatabaseOptions(target),
@@ -40,31 +66,14 @@ export async function executeSessionQuestionOperation(
     env: Object.freeze({ ...(target.env ?? process.env) }),
   };
   if (
-    input.kind === "register" ||
-    input.kind === "settle" ||
-    input.kind === "claim" ||
-    input.kind === "finish" ||
-    input.kind === "block"
-  ) {
-    const binding =
-      input.kind === "register"
-        ? input.question.sessionBinding
-        : input.expectedQuestion?.sessionBinding;
-    if (!binding) {
-      throw new SessionQuestionCustodyRetiredError(
-        "Captured durable question custody is required.",
-      );
-    }
-    if (
-      target.agentId !== binding.agentId ||
+    binding &&
+    (target.agentId !== binding.agentId ||
       target.sessionKey !== binding.sessionKey ||
-      database.path !== binding.databasePath ||
-      options.storePath !== binding.storePath
-    ) {
-      throw new SessionQuestionCustodyRetiredError(
-        "Captured durable question storage route was retired.",
-      );
-    }
+      options.storePath !== binding.storePath)
+  ) {
+    throw new SessionQuestionCustodyRetiredError(
+      "Captured durable question storage route was retired.",
+    );
   }
   if (input.kind === "get" || input.kind === "list") {
     return withSessionHistoryWorkerDatabase(database, async (owner) => {

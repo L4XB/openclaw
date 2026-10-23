@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createAdmittedRunOperatorAuthority } from "../../agents/admitted-run-context.js";
 import {
@@ -8,6 +9,7 @@ import * as questionStorage from "../../config/sessions/session-questions.js";
 import * as questionChannel from "../../infra/question-channel-runtime.js";
 import * as workerAdmission from "../../infra/sqlite-worker-operation-admission.js";
 import { ensureProfileForEmail } from "../../state/user-profiles.js";
+import { withEnvAsync } from "../../test-utils/env.js";
 import { withOpenClawTestState } from "../../test-utils/openclaw-test-state.js";
 import { createOwnRunFixture } from "./question.own-run.test-support.js";
 import {
@@ -24,6 +26,99 @@ const answers = { answers: { destination: ["Library"] } };
 const sessionScope = { agentId: "main", sessionKey: requestParams.sessionKey };
 
 describe("durable RPC mutation admission", () => {
+  it("registers and settles captured physical custody through a symlinked state route", async () => {
+    vi.useRealTimers();
+    await withOpenClawTestState({ scenario: "minimal" }, async (state) => {
+      const alias = state.path("state-alias");
+      fs.symlinkSync(state.stateDir, alias, process.platform === "win32" ? "junction" : "dir");
+      await withEnvAsync({ OPENCLAW_STATE_DIR: alias }, async () => {
+        const f = await createOwnRunFixture(true);
+        try {
+          expect(
+            await f.call(
+              "question.request",
+              { ...requestParams, id: "symlink-question", timeoutMs: 900_000, durable: true },
+              f.runtime,
+            ),
+          ).toMatchObject([true, { id: "symlink-question" }, undefined]);
+          const observation = manager.observe("symlink-question")!;
+          const binding = observation.sessionAccess?.durableBinding;
+          if (!binding) {
+            throw new Error("Expected the real prepared reader's durable binding");
+          }
+          expect(binding.databasePath).toBe(fs.realpathSync(binding.databasePath));
+          expect(binding.storePath.startsWith(alias)).toBe(true);
+          expect(broadcast).toHaveBeenCalledWith(
+            "question.requested",
+            expect.any(Object),
+            expect.any(Object),
+          );
+          const scope = {
+            agentId: binding.agentId,
+            sessionKey: binding.sessionKey,
+            storePath: binding.storePath,
+            assertCurrent() {},
+          };
+          const committedAnswers = { answers: { destination: ["Home"] } };
+          expect(
+            await f.call("question.resolve", {
+              id: "symlink-question",
+              answers: committedAnswers,
+            }),
+          ).toMatchObject([true, { status: "answered", answers: committedAnswers }, undefined]);
+          const owed = await questionStorage.readSessionQuestionCustody(
+            binding,
+            "symlink-question",
+            () => {},
+          );
+          expect(owed).toMatchObject({
+            record: { status: "answered", answers: committedAnswers },
+            continuation: { status: "owed" },
+          });
+          if (!owed) {
+            throw new Error("Expected committed question custody");
+          }
+          await expect(
+            questionStorage.executeSessionQuestionOperation(
+              { ...scope, storePath: state.statePath("forbidden.sqlite") },
+              {
+                kind: "claim",
+                id: "symlink-question",
+                expectedQuestion: owed,
+                runId: "forbidden-continuation",
+                gatewayEpoch: "symlink-gateway",
+              },
+            ),
+          ).rejects.toMatchObject({ code: "question-custody-retired" });
+          expect(
+            await questionStorage.readSessionQuestionCustody(binding, "symlink-question", () => {}),
+          ).toMatchObject({ continuation: { status: "owed" } });
+          const claimed = await questionStorage.executeSessionQuestionOperation(scope, {
+            kind: "claim",
+            id: "symlink-question",
+            expectedQuestion: owed,
+            runId: "symlink-continuation",
+            gatewayEpoch: "symlink-gateway",
+          });
+          expect(claimed).toMatchObject({ continuation: { status: "claimed" } });
+          if (!claimed || Array.isArray(claimed)) {
+            throw new Error("Expected claimed question custody");
+          }
+          expect(
+            await questionStorage.executeSessionQuestionOperation(scope, {
+              kind: "finish",
+              id: "symlink-question",
+              expectedQuestion: claimed,
+              runId: "symlink-continuation",
+            }),
+          ).toMatchObject({ continuation: { status: "settled" } });
+        } finally {
+          await f.close();
+        }
+      });
+    });
+  });
+
   it("retains the original channel model ceiling in worker-owned question custody", async () => {
     await withOpenClawTestState({ scenario: "minimal" }, async () => {
       const f = await createOwnRunFixture(true);
