@@ -116,7 +116,11 @@ export function createPostUpdateExceptionResult(
     error instanceof Error &&
     params.result.recovery?.serviceRestartSafe !== false
   ) {
-    const warning = `Gateway activation verified; post-update maintenance needs attention: ${message}`;
+    const warning =
+      `Gateway activation verified; post-update maintenance needs attention: ${message} ` +
+      "Inspect the reported launcher path and remove or replace the stale launcher, then run " +
+      "`command -v openclaw` (or `Get-Command openclaw` on Windows) and `openclaw --version` " +
+      "to confirm which installation is active.";
     return {
       message: warning,
       result: {

@@ -524,10 +524,15 @@ describe("successful update finalization ordering", () => {
       steps: [
         expect.objectContaining({
           name: "post-update maintenance",
-          advisory: expect.objectContaining({ kind: "recoverable-maintenance" }),
+          advisory: expect.objectContaining({
+            kind: "recoverable-maintenance",
+            message: expect.stringContaining("command -v openclaw"),
+          }),
         }),
       ],
     });
+    expect(failure.message).toContain("Get-Command openclaw");
+    expect(failure.message).toContain("openclaw --version");
     expect(failure.result.reason).toBeUndefined();
   });
 
