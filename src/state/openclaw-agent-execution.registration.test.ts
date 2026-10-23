@@ -242,7 +242,7 @@ function retireFailedReply(
       },
       finish(target, error, _value, settlement) {
         if (!directCompletion) {
-          return edge.forbidden();
+          edge.forbidden();
         }
         expect(target).toBe(job);
         settleNative(settlement);
