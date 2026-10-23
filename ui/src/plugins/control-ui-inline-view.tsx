@@ -1,9 +1,10 @@
-import { createMemo, createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show, useContext } from "solid-js";
 import type { PluginInlineViewBlock } from "../../../src/shared/plugin-inline-view.js";
 import { useOptionalApplication } from "../lib/reactive/context.ts";
 import { t } from "../lib/reactive/i18n.ts";
 import { createIntersectionObserver, createResizeObserver } from "../lib/reactive/observers.ts";
 import { projectSource } from "../lib/reactive/projection.ts";
+import { ContentPresentation } from "../lib/solid/presentation.ts";
 import { CustomPluginUiDisabled } from "./control-ui-disabled.solid.tsx";
 import { PluginContribution } from "./control-ui-view.solid.tsx";
 
@@ -22,6 +23,9 @@ export function PluginInlineView(props: {
   });
   const [near, setNear] = createSignal(false);
   const [height, setHeight] = createSignal(160);
+  const contentPresented = useContext(ContentPresentation);
+  // Retained rows can hide and resume without changing their prepared props.
+  const active = () => near() && props.presented !== false && contentPresented();
   let root!: HTMLDivElement;
   createIntersectionObserver(
     () => [root],
@@ -31,7 +35,7 @@ export function PluginInlineView(props: {
   createResizeObserver(
     () => [root],
     ([entry]) => {
-      if (near() && props.presented !== false && entry && entry.contentRect.height > 0) {
+      if (active() && entry && entry.contentRect.height > 0) {
         setHeight(entry.contentRect.height);
       }
     },
@@ -62,9 +66,9 @@ export function PluginInlineView(props: {
       ref={(element) => {
         root = element;
       }}
-      style={{ "min-height": near() && props.presented !== false ? undefined : height() + "px" }}
+      style={{ "min-height": active() ? undefined : height() + "px" }}
     >
-      <Show when={near() && props.presented !== false}>
+      <Show when={active()}>
         <Show when={status() === "ok"} fallback={notice()}>
           <PluginContribution
             kind="inlineViews"
