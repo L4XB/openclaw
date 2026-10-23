@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { expect, it } from "vitest";
@@ -32,9 +33,9 @@ it.skipIf(!stableRoot)(
     const stableManifest = JSON.parse(
       await readFile(path.join(stableRoot, "package.json"), "utf8"),
     );
-    const stableVersion = process.env.OPENCLAW_TEST_INSTALLED_STABLE_VERSION ?? "2026.10.5";
+    const stableVersion = process.env.OPENCLAW_TEST_INSTALLED_STABLE_VERSION ?? "2026.10.6";
     const stableSchemas =
-      stableVersion === "2026.10.5"
+      stableVersion === "2026.10.5" || stableVersion === "2026.10.6"
         ? { agent: 25, state: 20 }
         : stableVersion === "2026.10.1" || stableVersion === "2026.10.3"
           ? { agent: 24, state: 20 }
@@ -178,9 +179,20 @@ it.skipIf(!stableRoot)(
           },
           { expectFinal: false },
         );
-        expect(
-          await client.request("agent.wait", { runId: asking.runId, timeoutMs: 30_000 }),
-        ).toMatchObject({ status: "ok" });
+        const askingOutcome = await client.request("agent.wait", {
+          runId: asking.runId,
+          timeoutMs: 30_000,
+        });
+        if (!isRecord(askingOutcome) || askingOutcome.status !== "ok") {
+          const diagnosticsDir = await mkdtemp(path.join(os.tmpdir(), "openclaw-upgrade-failure-"));
+          await writeFile(
+            path.join(diagnosticsDir, "stable-turn.json"),
+            JSON.stringify({ askingOutcome, logs: instance.logs() }),
+            { mode: 0o600 },
+          );
+          trace("stable-turn-failed", { diagnosticsDir });
+        }
+        expect(askingOutcome).toMatchObject({ status: "ok" });
         await assertHistory();
         await assertSettings();
         await persistUsageCache();
@@ -220,7 +232,7 @@ it.skipIf(!stableRoot)(
         expect(migratedAgent?.version).toBe(32);
         expect(migratedAgent).toMatchObject({ hasQuestions: true, hasOutboxSequence: true });
         expect(migratedAgent?.cacheDigest).toBe(baselineAgent?.cacheDigest);
-        expect(migrated.some((row) => row.version === 29)).toBe(true);
+        expect(migrated.some((row) => row.version === 31)).toBe(true);
         trace("candidate-doctor", {
           versions: migrated.map((row) => row.version),
           cacheCount: migratedAgent?.cacheCount,
