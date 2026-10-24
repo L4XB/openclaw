@@ -374,6 +374,7 @@ function createPluginHandler(
             payload,
             cfg: params.cfg,
             accountId: params.accountId,
+            formatting: params.formatting,
           })
       : undefined,
     normalizePayload: outbound?.normalizePayload

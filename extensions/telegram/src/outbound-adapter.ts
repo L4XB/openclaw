@@ -343,9 +343,10 @@ export function createTelegramOutboundAdapter(
     // and strike delimiters. Rich accounts must keep the agent's HTML islands
     // (<details>, <tg-math-block>, checkbox lists) intact — the blocks emitter
     // owns them and keeps unsupported tags visibly literal, so tag-stripping
-    // here would silently flatten the advertised rich contract.
-    sanitizeText: ({ text, cfg, accountId }) =>
-      cfg && resolveTelegramRichMessages({ cfg, accountId })
+    // here would silently flatten the advertised rich contract. Caller-authored
+    // parse_mode HTML is sent as HTML, so its tags are the formatting itself.
+    sanitizeText: ({ text, cfg, accountId, formatting }) =>
+      formatting?.parseMode === "HTML" || (cfg && resolveTelegramRichMessages({ cfg, accountId }))
         ? sanitizeAssistantVisibleText(text)
         : sanitizeForPlainText(sanitizeAssistantVisibleText(text), { style: "markdown" }),
     shouldSuppressLocalPayloadPrompt: options.shouldSuppressLocalPayloadPrompt,

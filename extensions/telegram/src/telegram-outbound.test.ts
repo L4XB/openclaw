@@ -49,4 +49,19 @@ describe("telegramPlugin outbound", () => {
       }),
     ).toBe(literal);
   });
+
+  it("keeps caller-authored markup for parse_mode HTML deliveries", () => {
+    const html =
+      '<b>Disk</b> <a href="https://example.com/docs">docs</a> <tg-spoiler>secret</tg-spoiler>';
+    const sanitize = (formatting?: { parseMode: "HTML" }) =>
+      telegramOutbound.sanitizeText?.({
+        text: html,
+        payload: { text: html },
+        cfg: {},
+        accountId: "default",
+        ...(formatting ? { formatting } : {}),
+      });
+    expect(sanitize({ parseMode: "HTML" })).toBe(html);
+    expect(sanitize()).toBe("**Disk** docs secret");
+  });
 });

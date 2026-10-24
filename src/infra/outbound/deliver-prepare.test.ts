@@ -85,6 +85,40 @@ describe("outbound preparation metadata", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("passes the delivery formatting to plain-text sanitization", async () => {
+    const send = vi.fn(async () => {
+      throw new Error("Preparation must not send to the transport");
+    });
+    const sanitizeText = vi.fn(
+      ({ text, formatting }: { text: string; formatting?: { parseMode?: string } }) =>
+        formatting?.parseMode === "HTML" ? text : text.replace(/<[^>]+>/g, ""),
+    );
+    const plugin = createOutboundTestPlugin({
+      id: "formatting-test",
+      outbound: { deliveryMode: "direct", sendText: send, sendMedia: send, sanitizeText },
+    });
+    const registry = createTestRegistry([{ pluginId: plugin.id, plugin, source: "test" }]);
+    const batch = await withPluginRuntimeRegistryScope(registry, () =>
+      prepareOutboundPayloadBatch(
+        {
+          cfg: {},
+          channel: plugin.id,
+          to: "test-recipient",
+          formatting: { parseMode: "HTML" },
+          payloads: [{ text: "<b>bold</b>" }],
+        },
+        { hookRunner: createHookRunner(registry) },
+      ),
+    );
+    expect(sanitizeText).toHaveBeenCalledWith(
+      expect.objectContaining({ formatting: { parseMode: "HTML" } }),
+    );
+    expect(batch.entries).toEqual([
+      expect.objectContaining({ status: "accepted", payload: { text: "<b>bold</b>" } }),
+    ]);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it.each([false, true])(
     "normalizes whitespace without losing accepted metadata (media=%s)",
     (media) => {
