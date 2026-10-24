@@ -48,11 +48,9 @@ export async function enrichMatrixFormattedContent(params: {
       }
     : renderMarkdownToMatrixHtmlWithMentions({ ...params, markdown }));
   params.content.body = body || params.content.body;
-  if (mentions) {
-    params.content["m.mentions"] = mentions;
-  } else {
-    delete params.content["m.mentions"];
-  }
+  // Without m.mentions, Matrix still applies the legacy push rules that match display names,
+  // user IDs and @room in the body; an empty m.mentions notifies nobody.
+  params.content["m.mentions"] = mentions ?? {};
   if (!html) {
     delete params.content.format;
     delete params.content.formatted_body;
