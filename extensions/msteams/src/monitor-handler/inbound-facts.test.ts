@@ -46,6 +46,27 @@ describe("msteams inbound facts", () => {
     expect(assembleMSTeamsInboundFacts(entry).rawBody).toBe(expected);
   });
 
+  it("keeps other people's mentions in the text and removes the bot's", async () => {
+    const entry = await prepare({
+      text: "<at>OpenClaw</at> please ask <at>Alice Smith</at> to review the PR",
+      recipient: { id: "28:bot" },
+      entities: [
+        {
+          type: "mention",
+          text: "<at>OpenClaw</at>",
+          mentioned: { id: "28:bot", name: "OpenClaw" },
+        },
+        {
+          type: "mention",
+          text: "<at>Alice Smith</at>",
+          mentioned: { id: "29:alice", name: "Alice Smith" },
+        },
+      ],
+    });
+
+    expect(entry.text).toBe("please ask @Alice Smith to review the PR");
+  });
+
   it("strips native mentions from card text when HTML has no visible text", async () => {
     const entry = await prepare({
       attachments: [{ contentType: "text/html", content: "<at>Bot</at>" }],

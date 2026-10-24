@@ -12,6 +12,24 @@ describe("msteams inbound", () => {
     expect(stripMSTeamsMentionTags('hi <at itemid="2">Bot</at>')).toBe("hi");
   });
 
+  it("keeps the names of other people the message mentions", () => {
+    const activity = {
+      recipient: { id: "bot" },
+      entities: [
+        { type: "mention", text: "<at>OpenClaw</at>", mentioned: { id: "bot" } },
+        { type: "mention", text: "<at>Alice Smith</at>", mentioned: { id: "29:alice" } },
+      ],
+    };
+
+    expect(
+      stripMSTeamsMentionTags(
+        "<at>OpenClaw</at> please ask <at>Alice Smith</at> to review the PR",
+        activity,
+      ),
+    ).toBe("please ask @Alice Smith to review the PR");
+    expect(stripMSTeamsMentionTags("<at>OpenClaw</at> /status", activity)).toBe("/status");
+  });
+
   describe("parseMSTeamsActivityTimestamp", () => {
     const timestamp = "2024-01-01T00:00:00.000Z";
     it("returns undefined for empty/invalid values", () => {

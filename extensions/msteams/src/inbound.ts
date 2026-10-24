@@ -75,6 +75,7 @@ type MentionableActivity = {
   recipient?: { id?: string } | null;
   entities?: Array<{
     type?: string;
+    text?: string;
     mentioned?: { id?: string };
   }> | null;
 };
@@ -106,9 +107,21 @@ export function parseMSTeamsActivityTimestamp(value: unknown): Date | undefined 
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-export function stripMSTeamsMentionTags(text: string): string {
-  // Teams wraps mentions in <at>...</at> tags
-  return text.replace(/<at[^>]*>.*?<\/at>/gi, "").trim();
+export function stripMSTeamsMentionTags(text: string, activity?: MentionableActivity): string {
+  // Teams wraps mentions in <at>...</at> tags. The bot's own mention only addresses the bot, but a
+  // mention of someone else is part of the message, so it stays as "@Name".
+  const botId = activity?.recipient?.id;
+  const otherMentions = (activity?.entities ?? []).filter(
+    (entity) =>
+      entity.type === "mention" &&
+      entity.mentioned?.id !== undefined &&
+      entity.mentioned.id !== botId,
+  );
+  return text
+    .replace(/<at[^>]*>(.*?)<\/at>/gi, (tag, name: string) =>
+      otherMentions.some((entity) => entity.text === tag) ? `@${name}` : "",
+    )
+    .trim();
 }
 
 export function wasMSTeamsBotMentioned(activity: MentionableActivity): boolean {

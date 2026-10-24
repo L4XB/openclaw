@@ -51,7 +51,7 @@ export async function prepareMSTeamsDebounceEntry(params: {
   const rawText = activity.text?.trim() ?? "";
   // HTML mentions are stripped before decoding so literally typed <at> tags survive.
   const text = rawText
-    ? stripMSTeamsMentionTags(rawText)
+    ? stripMSTeamsMentionTags(rawText, activity)
     : extractTextFromHtmlAttachments(attachments) ||
       stripMSTeamsMentionTags(serializeMSTeamsAdaptiveCardActionValue(activity.value) || "");
   const conversationId = normalizeMSTeamsConversationId(activity.conversation?.id ?? "");
