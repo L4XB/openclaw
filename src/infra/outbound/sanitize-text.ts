@@ -1,3 +1,4 @@
+import { findMarkdownTableRanges } from "../../../packages/markdown-core/src/ir.js";
 import { findCodeRegions } from "../../shared/text/code-regions.js";
 import { flattenMarkdownDetails } from "./markdown-details.js";
 // Plain-text sanitization strips internal runtime scaffolding and converts a
@@ -74,12 +75,30 @@ function stripHtmlTagUnlessComparison(
     : "";
 }
 
+const HTML_BREAK_RE = /<br\s*\/?>/gi;
+
+// A table row cannot hold a line break: a newline would end the row and turn the rest of the cell
+// into a row of its own, so a break inside a table becomes a space.
+function joinTableCellBreaks(text: string): string {
+  if (!text.includes("|") || !/<br\s*\/?>/i.test(text)) {
+    return text;
+  }
+  let joined = "";
+  let cursor = 0;
+  for (const table of findMarkdownTableRanges(text)) {
+    joined += text.slice(cursor, table.start);
+    joined += text.slice(table.start, table.end).replace(HTML_BREAK_RE, " ");
+    cursor = table.end;
+  }
+  return joined + text.slice(cursor);
+}
+
 function convertHtmlOutsideCode(text: string, options: { style?: "markdown" }): string {
   const boldMarker = options.style === "markdown" ? "**" : "*";
   const strikeMarker = options.style === "markdown" ? "~~" : "~";
   // Remove inner elements first so an empty nested tree cannot synthesize markers.
   const converted = removeMatchesUntilStable(
-    text
+    joinTableCellBreaks(text)
       // `|` ends the autolink URL so `<url|Label>` reaches the label projection.
       .replace(/<((?:https?:\/\/|mailto:)[^<>\s|]+)>/gi, "$1")
       // Raw channel link syntax is not an input dialect; retain only its visible label.
@@ -88,7 +107,7 @@ function convertHtmlOutsideCode(text: string, options: { style?: "markdown" }): 
       .replace(CONVERTIBLE_HTML_OPEN_TAG_RE, "<$1>"),
     EMPTY_HTML_ELEMENT_RE,
   )
-    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(HTML_BREAK_RE, "\n")
     .replace(/<\/?(p|div)>/gi, "\n")
     .replace(/<(b|strong)>(.*?)<\/\1>/gi, `${boldMarker}$2${boldMarker}`)
     .replace(/<(i|em)>(.*?)<\/\1>/gi, "_$2_")

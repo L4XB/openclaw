@@ -68,6 +68,14 @@ describe("sanitizeForPlainText", () => {
     expect(elapsedMs).toBeLessThan(500);
   });
 
+  it("keeps a line break inside a table cell in its row", () => {
+    const table =
+      "| Step | Details |\n|---|---|\n| 1 | Open the app<br>Tap Settings |\n| 2 | Sign in |";
+    expect(sanitizeForPlainText(`Steps:\n\n${table}\n\nDone.<br/>Thanks`)).toBe(
+      "Steps:\n\n| Step | Details |\n|---|---|\n| 1 | Open the app Tap Settings |\n| 2 | Sign in |\n\nDone.\nThanks",
+    );
+  });
+
   it("strips markup rather than preserving it as comparison prose", () => {
     expect(sanitizeForPlainText("attempts<max threshold>5s")).toBe("attempts5s");
   });
