@@ -128,6 +128,25 @@ export async function buildSkillItems(params: {
   return items;
 }
 
+const COMMAND_FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/u;
+
+// A command declares its description in frontmatter. The first body paragraph is
+// only a fallback, and it is often a heading such as "## Context".
+function readCommandDescription(frontmatter: string | undefined): string | undefined {
+  const line = frontmatter?.split(/\r?\n/u).find((entry) => entry.startsWith("description:"));
+  const value = line?.slice("description:".length).trim();
+  // Block scalars (`|`, `>-`) continue on later lines; keep the fallback for them.
+  if (!value || /^[|>][+-]?$/u.test(value)) {
+    return undefined;
+  }
+  const quote = value.at(0);
+  const unquoted =
+    (quote === '"' || quote === "'") && value.length > 1 && value.at(-1) === quote
+      ? value.slice(1, -1)
+      : value;
+  return unquoted.replaceAll(/\s+/g, " ").trim() || undefined;
+}
+
 export async function applyGeneratedSkillItem(
   item: MigrationItem,
   reportDir: string,
@@ -155,12 +174,15 @@ export async function applyGeneratedSkillItem(
       );
     }
     const commandContent = bytes.toString("utf8");
+    const frontmatter = COMMAND_FRONTMATTER_PATTERN.exec(commandContent)?.[1];
     const description =
+      readCommandDescription(frontmatter) ??
       commandContent
-        .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/u, "")
+        .replace(COMMAND_FRONTMATTER_PATTERN, "")
         .split(/\r?\n\r?\n/u)
         .map((part) => part.replaceAll(/\s+/g, " ").trim())
-        .find(Boolean) ?? `Imported Claude command ${skillName}`;
+        .find(Boolean) ??
+      `Imported Claude command ${skillName}`;
     const content = [
       "---",
       `name: ${skillName}`,

@@ -613,6 +613,38 @@ describe("Claude migration provider", () => {
     await fs.access(path.join(reportDir, "summary.md"));
   });
 
+  it("takes an imported command's description from its frontmatter", async () => {
+    await writeFiles(projectDir, {
+      ".claude/commands/commit.md": [
+        "---",
+        "description: Create a git commit from the staged changes",
+        "argument-hint: [message]",
+        "---",
+        "",
+        "## Context",
+        "",
+        "- Current git status: !`git status`",
+        "",
+      ].join("\n"),
+      ".claude/commands/review.md": '---\ndescription: "Review: the open PR"\n---\n\n# Review\n',
+    });
+    const config: OpenClawConfig = { agents: { defaults: { workspace: workspaceDir } } };
+    await provider.apply(
+      contextFor(projectDir, { reportDir, runtime: makeConfigRuntime(config), config }),
+    );
+
+    const descriptionOf = async (name: string) =>
+      (await readText(workspaceDir, "skills", name, "SKILL.md"))
+        .split("\n")
+        .find((line) => line.startsWith("description: "));
+    expect(await descriptionOf("claude-command-commit")).toBe(
+      `description: ${JSON.stringify("Create a git commit from the staged changes")}`,
+    );
+    expect(await descriptionOf("claude-command-review")).toBe(
+      `description: ${JSON.stringify("Review: the open PR")}`,
+    );
+  });
+
   it("backs up the whole generated skill directory before overwriting it", async () => {
     const { targetDir, targetFile } = await commandFixture();
     const context = contextFor(projectDir, { reportDir });
