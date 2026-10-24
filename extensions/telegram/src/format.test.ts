@@ -91,6 +91,19 @@ describe("Telegram formatting", () => {
     }
   });
 
+  it.each([
+    ["x <= y and <b>important</b>", "x &lt;= y and <b>important</b>"],
+    ["<3 and <i>love</i>", "&lt;3 and <i>love</i>"],
+    ["Range 1<x<9 with <code>x</code>", "Range 1&lt;x&lt;9 with <code>x</code>"],
+    ["<code>while (i<n) i++;</code>", "<code>while (i&lt;n) i++;</code>"],
+    [
+      '<pre><code class="language-js">if (a < b) return;</code></pre>',
+      '<pre><code class="language-js">if (a &lt; b) return;</code></pre>',
+    ],
+  ])("escapes a bare < in HTML text without the tag after it: %s", (input, expected) => {
+    expect(renderTelegramHtmlText(input, { textMode: "html" })).toBe(expected);
+  });
+
   it("aligns Unicode cells in raw HTML table fallbacks", () => {
     const input = [
       "<table><tr><th>Name</th><th>Mark</th><th>Note</th></tr>",
