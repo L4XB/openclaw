@@ -613,6 +613,36 @@ describe("Claude migration provider", () => {
     await fs.access(path.join(reportDir, "summary.md"));
   });
 
+  it("imports Claude MCP transport types as OpenClaw transports", async () => {
+    await writeJson(path.join(projectDir, ".mcp.json"), {
+      mcpServers: {
+        remote: { type: "http", url: "https://mcp.example.com/mcp", headers: { "X-Team": "docs" } },
+        events: { type: "sse", url: "https://mcp.example.com/sse" },
+        local: {
+          type: "stdio",
+          command: "node",
+          args: ["server.js"],
+          workingDirectory: "/srv/mcp",
+        },
+      },
+    });
+    const config: OpenClawConfig = { agents: { defaults: { workspace: workspaceDir } } };
+    const result = await provider.apply(
+      contextFor(projectDir, { reportDir, runtime: makeConfigRuntime(config), config }),
+    );
+
+    expect(result.summary.errors).toBe(0);
+    expect(config.mcp?.servers).toEqual({
+      remote: {
+        url: "https://mcp.example.com/mcp",
+        transport: "streamable-http",
+        headers: { "X-Team": "docs" },
+      },
+      events: { url: "https://mcp.example.com/sse", transport: "sse" },
+      local: { command: "node", args: ["server.js"], cwd: "/srv/mcp" },
+    });
+  });
+
   it("backs up the whole generated skill directory before overwriting it", async () => {
     const { targetDir, targetFile } = await commandFixture();
     const context = contextFor(projectDir, { reportDir });

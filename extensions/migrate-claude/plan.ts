@@ -25,6 +25,15 @@ type MappedMcpSource = {
   servers: Record<string, unknown>;
 };
 
+// Claude names the transport in `type`; OpenClaw reads `transport` (a command
+// already means stdio), so a server that kept `type: "http"` would connect over SSE.
+const CLAUDE_MCP_TRANSPORTS = new Map<string, string | undefined>([
+  ["http", "streamable-http"],
+  ["streamable-http", "streamable-http"],
+  ["sse", "sse"],
+  ["stdio", undefined],
+]);
+
 function mapMcpServers(raw: unknown): Record<string, unknown> | undefined {
   if (!isRecord(raw)) {
     return undefined;
@@ -40,9 +49,7 @@ function mapMcpServers(raw: unknown): Record<string, unknown> | undefined {
       "args",
       "env",
       "cwd",
-      "workingDirectory",
       "url",
-      "type",
       "transport",
       "headers",
       "connectionTimeoutMs",
@@ -50,6 +57,18 @@ function mapMcpServers(raw: unknown): Record<string, unknown> | undefined {
       if (value[key] !== undefined) {
         next[key] = value[key];
       }
+    }
+    const type = typeof value.type === "string" ? value.type.trim().toLowerCase() : undefined;
+    if (type !== undefined && CLAUDE_MCP_TRANSPORTS.has(type)) {
+      const transport = CLAUDE_MCP_TRANSPORTS.get(type);
+      if (transport && next.transport === undefined) {
+        next.transport = transport;
+      }
+    } else if (value.type !== undefined) {
+      next.type = value.type;
+    }
+    if (next.cwd === undefined && value.workingDirectory !== undefined) {
+      next.cwd = value.workingDirectory;
     }
     if (Object.keys(next).length > 0) {
       mapped[name] = next;
