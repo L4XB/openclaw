@@ -9,6 +9,7 @@ import {
   parseFenceSpans,
   type FenceSpan,
 } from "../../packages/markdown-core/src/fences.js";
+import { findMarkdownTableRanges } from "../../packages/markdown-core/src/ir.js";
 import { scanParenAwareBreakpoints } from "../../packages/markdown-core/src/text-breakpoints.js";
 import type { ChannelId } from "../channels/plugins/types.core.js";
 import { resolveChannelStreamingChunkMode } from "../channels/streaming.js";
@@ -315,15 +316,20 @@ export function chunkMarkdownText(text: string, limit: number): string[] {
 
   const chunks: string[] = [];
   const spans = parseFenceSpans(text);
+  const tables = text.includes("|") ? findMarkdownTableRanges(text) : [];
   let start = 0;
   let reopenFence: FenceSpan | undefined;
+  let tableHeader = "";
 
   while (start < text.length) {
     const reopenLine = reopenFence ? resolveFenceReopenLine(reopenFence, normalizedLimit) : "";
     const reopenPrefix = reopenLine ? `${reopenLine}\n` : "";
-    const contentLimit = Math.max(1, normalizedLimit - reopenPrefix.length);
+    // Rows that continue a split table follow its header again, so they still parse as a table.
+    const chunkPrefix = reopenPrefix || tableHeader;
+    tableHeader = "";
+    const contentLimit = Math.max(1, normalizedLimit - chunkPrefix.length);
     if (text.length - start <= contentLimit) {
-      const finalChunk = `${reopenPrefix}${text.slice(start)}`;
+      const finalChunk = `${chunkPrefix}${text.slice(start)}`;
       if (finalChunk.length > 0) {
         chunks.push(finalChunk);
       }
@@ -389,12 +395,25 @@ export function chunkMarkdownText(text: string, limit: number): string[] {
       }
     }
 
+    const table = initialFence
+      ? undefined
+      : tables.find((candidate) => candidate.start < breakIdx && breakIdx < candidate.end);
+    if (table) {
+      const beforeTable = trimEndWhitespaceGraphemes(text, table.start).length;
+      if (table.end - table.start <= normalizedLimit && beforeTable > start) {
+        // A table that fits one chunk moves to the next chunk whole.
+        breakIdx = beforeTable;
+      } else if (text[breakIdx] === "\n") {
+        tableHeader = findTableContinuationHeader(text, table, normalizedLimit);
+      }
+    }
+
     const rawContent = text.slice(start, breakIdx);
     if (!rawContent) {
       break;
     }
 
-    let rawChunk = `${reopenPrefix}${rawContent}`;
+    let rawChunk = `${chunkPrefix}${rawContent}`;
     let nextStart = breakIdx;
 
     if (fenceToSplit) {
@@ -411,6 +430,30 @@ export function chunkMarkdownText(text: string, limit: number): string[] {
     start = nextStart;
   }
   return chunks;
+}
+
+/** The header and delimiter rows that frame a continuation of `table`, or "" when they cannot. */
+function findTableContinuationHeader(
+  text: string,
+  table: { start: number; end: number },
+  limit: number,
+): string {
+  // Only a table that parses on its own keeps parsing when its rows follow a copied header.
+  const standalone = findMarkdownTableRanges(text.slice(table.start, table.end))[0];
+  if (standalone?.start !== 0 || standalone.end !== table.end - table.start) {
+    return "";
+  }
+  const headerEnd = text.indexOf("\n", text.indexOf("\n", table.start) + 1) + 1;
+  if (headerEnd <= table.start || headerEnd >= table.end) {
+    return "";
+  }
+  const header = text.slice(table.start, headerEnd);
+  return text
+    .slice(headerEnd, table.end)
+    .split("\n")
+    .every((row) => header.length + row.length < limit)
+    ? header
+    : "";
 }
 
 function resolveFenceReopenLine(fence: FenceSpan, limit: number): string {

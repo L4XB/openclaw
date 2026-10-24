@@ -257,6 +257,25 @@ describe("chunkMarkdownText", () => {
     expect(chunks.every((chunk) => chunk.length <= limit)).toBe(true);
     expectNoEmptyFencedChunks(chunks);
   });
+
+  it("moves a table that fits one chunk to the next chunk whole", () => {
+    const rows = Array.from({ length: 8 }, (_, index) => `| r${index} | ok |`);
+    const table = ["| ID | State |", "|---|---|", ...rows].join("\n");
+    const prose = "p".repeat(60);
+    expect(chunkMarkdownText(`${prose}\n\n${table}\n\nDone.`, 140)).toEqual([
+      prose,
+      `${table}\n\nDone.`,
+    ]);
+  });
+
+  it("repeats the header rows when it splits a table longer than the limit", () => {
+    const header = "| ID | State |\n|---|---|\n";
+    const rows = Array.from({ length: 30 }, (_, index) => `| r${index} | ok |`);
+    const chunks = chunkMarkdownText(`${header}${rows.join("\n")}`, 120);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.startsWith(header) && chunk.length <= 120)).toBe(true);
+    expect(chunks.flatMap((chunk) => chunk.slice(header.length).split("\n"))).toEqual(rows);
+  });
 });
 
 describe("chunkByNewline", () => {
