@@ -23,6 +23,16 @@ const openaiUrl = "https://api.openai.com/v1";
 const chatgptUrl = "https://chatgpt.com/backend-api/codex";
 const proxyUrl = "http://proxy.example:80";
 const bothProxies = { HTTP_PROXY: proxyUrl, HTTPS_PROXY: proxyUrl };
+// What the managed proxy writes in gateway-only mode (applyProxyEnv and
+// LOOPBACK_NO_PROXY in src/infra/net/proxy/proxy-lifecycle.ts).
+const managedLoopbackNoProxy = "127.0.0.1,localhost,localhost.,::1,[::1],127.0.0.0/8";
+const managedGatewayOnlyEnv = {
+  ...bothProxies,
+  http_proxy: proxyUrl,
+  https_proxy: proxyUrl,
+  NO_PROXY: managedLoopbackNoProxy,
+  no_proxy: managedLoopbackNoProxy,
+};
 type ThreadParams = Parameters<typeof prepareConfig>[0];
 type ModelParams = Parameters<typeof createCodexInferenceModelBinding>[0];
 type ModelRequest = Parameters<ReturnType<typeof createCodexInferenceModelBinding>>[0];
@@ -480,6 +490,13 @@ it("fails closed for host OAuth on native backend and custom provider configurat
   const route = await prepare(h, "apiKey", undefined, true);
   expect(route.upstream).toBe(openaiUrl);
 });
+it("starts ChatGPT subscription sharing behind the managed proxy's gateway-only defaults", () => {
+  for (const [key, value] of Object.entries(managedGatewayOnlyEnv)) {
+    vi.stubEnv(key, value);
+  }
+  const h = harness();
+  expect(() => ownClient(h.client, {}, { resolve: vi.fn() })).not.toThrow();
+});
 it("leaves unowned native clients completely untouched", async () => {
   const h = harness();
   expect(await prepareThread(h.client)).toBeUndefined();
@@ -600,6 +617,7 @@ it.each([
     env: { ...bothProxies, NO_PROXY: "127.0.0.1,localhost" },
     supported: true,
   },
+  { env: managedGatewayOnlyEnv, supported: true },
   { env: { HTTPS_PROXY: proxyUrl }, supported: true },
   { env: { HTTPS_PROXY: " " + proxyUrl + " " }, supported: false },
   { env: { HTTPS_PROXY: proxyUrl, REQUEST_METHOD: "GET" }, supported: false },
