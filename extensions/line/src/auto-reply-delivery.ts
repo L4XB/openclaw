@@ -1,5 +1,6 @@
 import type { messagingApi } from "@line/bot-sdk";
 import { isChannelPartialDeliveryError } from "openclaw/plugin-sdk/channel-inbound";
+import { sanitizeForPlainText } from "openclaw/plugin-sdk/channel-outbound";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import {
   collectErrorGraphCandidates,
@@ -224,7 +225,10 @@ export async function deliverLineAutoReply(params: {
 
   // Inbound auto-replies bypass the channel outbound adapter, so enforce the
   // same assistant-visible boundary here before Markdown can create LINE UI.
-  const visibleText = payload.text ? sanitizeAssistantVisibleText(payload.text) : "";
+  // LINE renders no HTML, so model tags become text or Markdown first.
+  const visibleText = payload.text
+    ? sanitizeForPlainText(sanitizeAssistantVisibleText(payload.text), { style: "markdown" })
+    : "";
   const processed = visibleText ? processLineMessage(visibleText) : [];
 
   const markdownMessages = processed.flatMap<messagingApi.FlexMessage | messagingApi.TextMessage>(

@@ -193,6 +193,20 @@ describe("deliverLineAutoReply", () => {
     expect(result).toEqual({ status: "delivered", replyTokenUsed: true, visibleReplySent: true });
   });
 
+  it("turns model HTML into text on the inbound auto-reply path", async () => {
+    const { replyMessageLine } = createOrderedDeps();
+
+    await deliver({
+      text: "Summary first.\n\n<details>\n<summary>Full log</summary>\n\nStep 1 ok\n\n</details>\n\nThis is <b>important</b>.",
+    });
+
+    expect(replyMessageLine).toHaveBeenCalledWith(
+      ...replyArgs([
+        { type: "text", text: "Summary first.\n\nFull log\n\nStep 1 ok\n\nThis is important." },
+      ]),
+    );
+  });
+
   it("uses fallback text for quick-reply-only payloads", async () => {
     const lineData = { quickReplies: ["A", "B"] };
     const { replyMessageLine, pushMessagesLine } = createDeps();

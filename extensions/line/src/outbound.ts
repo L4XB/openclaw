@@ -4,7 +4,10 @@ import {
   createChannelPartialDeliveryError,
   isChannelPartialDeliveryError,
 } from "openclaw/plugin-sdk/channel-inbound";
-import { createChannelMessageAdapterFromOutbound } from "openclaw/plugin-sdk/channel-outbound";
+import {
+  createChannelMessageAdapterFromOutbound,
+  sanitizeForPlainText,
+} from "openclaw/plugin-sdk/channel-outbound";
 import {
   createAttachedChannelResultAdapter,
   createEmptyChannelResult,
@@ -41,7 +44,8 @@ export const lineOutboundAdapter: NonNullable<ChannelPlugin<ResolvedLineAccount>
   deliveryMode: "direct",
   chunker: (text, limit) => getLineRuntime().channel.text.chunkMarkdownText(text, limit),
   textChunkLimit: 5000,
-  sanitizeText: ({ text }) => sanitizeAssistantVisibleText(text),
+  sanitizeText: ({ text }) =>
+    sanitizeForPlainText(sanitizeAssistantVisibleText(text), { style: "markdown" }),
   presentationCapabilities: LINE_PRESENTATION_CAPABILITIES,
   renderPresentation: ({ payload, presentation, sourcePresentation, ctx }) =>
     renderLinePresentation(payload, presentation, ctx.to, sourcePresentation),
