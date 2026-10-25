@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ContentBlockSchema, ToolSchema } from "@modelcontextprotocol/core";
 import type { CallToolResult, ContentBlock, Tool } from "@modelcontextprotocol/server";
+import { normalizeToolParameterSchema } from "@openclaw/ai/internal/tool-schema";
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 // Plugin MCP tool handlers route plugin tool calls through the active runtime.
 import {
@@ -54,6 +55,13 @@ function resolveJsonSchemaForTool(tool: AnyAgentTool): Tool["inputSchema"] {
   const params = tool.parameters;
   if (params && typeof params === "object" && "type" in params) {
     return ToolSchema.shape.inputSchema.parse(params);
+  }
+  if (params && typeof params === "object") {
+    // Top-level unions (Type.Union) have no root type. Project them to one object root, as the
+    // agent and bundle MCP tool paths do, instead of dropping every parameter.
+    return ToolSchema.shape.inputSchema.parse(
+      normalizeToolParameterSchema(params, { toolName: tool.name }),
+    );
   }
   return { type: "object", properties: {} };
 }

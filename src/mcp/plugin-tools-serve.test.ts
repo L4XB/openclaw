@@ -1,3 +1,4 @@
+import { Type } from "typebox";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   consumeAdjustedParamsForToolCall,
@@ -213,6 +214,27 @@ describe("plugin tools MCP server", () => {
       expect(consumeAdjustedParamsForToolCall(toolCallId)).toBeUndefined();
       expect(consumeAdjustedParamsForToolCall(toolCallId, runId)).toBeUndefined();
     }
+  });
+
+  it("lists every field of a tool whose parameters are a top-level union", async () => {
+    // Shaped like voice_call: one object variant per action.
+    const tool: AnyAgentTool = {
+      ...createTool("voice_call", vi.fn()),
+      parameters: Type.Union([
+        Type.Object({ action: Type.Literal("initiate_call"), to: Type.String() }),
+        Type.Object({ action: Type.Literal("end_call"), callId: Type.String() }),
+      ]),
+    };
+    const { createToolsMcpServer } =
+      await vi.importActual<typeof import("./tools-stdio-server.js")>("./tools-stdio-server.js");
+    const server = createToolsMcpServer({ name: "plugin-tools-union-test", tools: [tool] });
+    await withMcpConnection(server, async (client) => {
+      const { tools } = await client.listTools();
+      const schema = tools.find((listed) => listed.name === "voice_call")?.inputSchema;
+      expect(schema?.type).toBe("object");
+      expect(Object.keys(schema?.properties ?? {}).toSorted()).toEqual(["action", "callId", "to"]);
+      expect(schema?.properties?.action).toMatchObject({ enum: ["initiate_call", "end_call"] });
+    });
   });
 
   it("delivers source-shaped images through a real MCP client", async () => {
