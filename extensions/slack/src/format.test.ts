@@ -181,6 +181,12 @@ describe("normalizeSlackOutboundText", () => {
       ["renders ordered lists with numbering", "2. two\n3. three", "2. two\n3. three"],
       ["renders headings as bold text", "# Title", "*Title*"],
       ["renders blockquotes", "> Quote", "> Quote"],
+      [
+        "quotes every line of a multi-line blockquote",
+        "> **Error:** build failed\n> at step 3\n> exit code 1\n\nTry again.",
+        "> *Error:* build failed\n> at step 3\n> exit code 1\n\nTry again.",
+      ],
+      ["quotes each item of a list in a blockquote", "> - one\n> - two", "> • one\n> • two"],
     ] as const;
     for (const [name, input, expected] of cases) {
       expect(normalizeSlackOutboundText(input), name).toBe(expected);

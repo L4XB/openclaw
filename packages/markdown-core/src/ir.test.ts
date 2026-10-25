@@ -419,6 +419,21 @@ it.each<[string, string, Parameters<typeof markdownToIR>[1]?]>([
   expect(markdownToIR(markdown, options).text).toBe(expected);
 });
 
+it.each([
+  ["> line 1\n> line 2\n\nafter", "> line 1\n> line 2\n\nafter"],
+  ["> line 1  \n> line 2", "> line 1\n> line 2"],
+  [
+    "> First paragraph.\n>\n> Second paragraph.\n\nReply.",
+    "> First paragraph.\n\n> Second paragraph.\n\nReply.",
+  ],
+  ["> - one\n> - two", "> • one\n> • two"],
+  ["> > inner 1\n> > inner 2", "> > inner 1\n> > inner 2"],
+  ["> outer\n>\n> > inner", "> outer\n\n> > inner"],
+  ["> intro\n> ```\n> code\n> ```\n> after", "> intro\n\ncode\n\n> after"],
+])("prefixes every quoted line in %j", (markdown, expected) => {
+  expect(markdownToIR(markdown, { blockquotePrefix: "> " }).text).toBe(expected);
+});
+
 it("does not linkify URLs inside raw HTML tag attributes", () => {
   const source =
     '<img src="https://example.com/diagram.png" alt="Diagram"> https://example.com/page';

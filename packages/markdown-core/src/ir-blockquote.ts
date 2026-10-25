@@ -25,3 +25,53 @@ export function resolveBlockquoteEnd(
   }
   return end;
 }
+
+// Tokens that never start a quoted line's content: closers, breaks (the next token starts the
+// line), list and table containers, and code blocks, which stay unprefixed.
+const UNQUOTED_LINE_TOKENS = new Set([
+  "softbreak",
+  "hardbreak",
+  "inline",
+  "fence",
+  "code_block",
+  "bullet_list_open",
+  "ordered_list_open",
+  "table_open",
+  "thead_open",
+  "tbody_open",
+  "tr_open",
+  "th_open",
+  "td_open",
+]);
+
+/**
+ * Prefix-quoted text (Slack, Signal, WhatsApp) marks every line of a quote: an opening quote
+ * writes its prefix, and the first token of each new line inside a quote writes the prefix once
+ * per quote level.
+ */
+export function prefixQuotedLine(
+  state: {
+    text: string;
+    blockquotePrefix: string;
+    blockquoteStack: readonly unknown[];
+    table: unknown;
+  },
+  tokenType: string,
+): void {
+  if (!state.blockquotePrefix || state.table) {
+    return;
+  }
+  const depth = state.blockquoteStack.length;
+  const atLineStart = state.text.endsWith("\n");
+  if (tokenType === "blockquote_open") {
+    // A nested quote that starts a new line repeats the outer levels before its own.
+    state.text += state.blockquotePrefix.repeat(atLineStart ? depth + 1 : 1);
+    return;
+  }
+  if (depth === 0 || !atLineStart || tokenType.endsWith("_close")) {
+    return;
+  }
+  if (!UNQUOTED_LINE_TOKENS.has(tokenType)) {
+    state.text += state.blockquotePrefix.repeat(depth);
+  }
+}

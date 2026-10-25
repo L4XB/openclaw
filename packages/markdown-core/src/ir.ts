@@ -13,7 +13,7 @@ import {
 import { chunkText } from "./chunk-text.js";
 import { matchMarkdownHtmlTag, tokenizeHtmlTags } from "./html-tags.js";
 import { appendAssistantTranscriptRoleText, appendImageAlternative } from "./ir-annotations.js";
-import { resolveBlockquoteEnd } from "./ir-blockquote.js";
+import { prefixQuotedLine, resolveBlockquoteEnd } from "./ir-blockquote.js";
 import {
   appendHtmlTags,
   attachBlockMetadata,
@@ -936,6 +936,7 @@ function renderTable(state: RenderState) {
 function renderTokens(tokens: MarkdownToken[], state: RenderState): void {
   const nextMappedBlockStarts = computeNextMappedBlockStarts(tokens);
   for (const [tokenIndex, token] of tokens.entries()) {
+    prefixQuotedLine(state, token.type);
     const inlineStyle = INLINE_STYLE_BY_TOKEN.get(token.type);
     if (inlineStyle) {
       if (inlineStyle !== "spoiler" || state.enableSpoilers) {
@@ -1041,9 +1042,6 @@ function renderTokens(tokens: MarkdownToken[], state: RenderState): void {
         appendHeadingSeparator(state, nextMappedBlockStarts[tokenIndex]);
         break;
       case "blockquote_open":
-        if (state.blockquotePrefix) {
-          state.text += state.blockquotePrefix;
-        }
         state.blockquoteStack.push({
           start: state.text.length,
           depth: state.env.listStack.length + state.blockquoteStack.length + 1,
