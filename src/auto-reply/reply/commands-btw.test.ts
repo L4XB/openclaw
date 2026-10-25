@@ -6,6 +6,7 @@ import type { runBtwSideQuestion } from "../../agents/btw.js";
 import { resolveMessageActionTurnCapability } from "../../gateway/message-action-turn-capability.js";
 import { expectObjectFields, mockFirstObjectArg } from "../../test-utils/mock-call-assertions.js";
 import { resolveAgentDirMock } from "./commands-agent-scope.test-support.js";
+import { buildCommandContextForTest } from "./commands-context.test-support.js";
 import { buildCommandTestParams } from "./commands.test-harness.js";
 import { createMockTypingController } from "./test-helpers.js";
 
@@ -212,4 +213,25 @@ describe("handleBtwCommand", () => {
       expectReply(result, "answer", question);
     },
   );
+
+  it("passes every line of a side question asked in a group", async () => {
+    runBtwSideQuestionMock.mockResolvedValue({ text: "answer" });
+    const body = "@openclaw /btw why does this fail?\n\nError: ENOSPC\n    at write (app.js:3:5)";
+    const params = activeParams(body);
+    params.cfg = { ...params.cfg, messages: { groupChat: { mentionPatterns: ["@openclaw"] } } };
+    params.isGroup = true;
+    params.command = buildCommandContextForTest({
+      ctx: params.ctx,
+      cfg: params.cfg,
+      isGroup: true,
+      triggerBodyNormalized: body,
+      commandAuthorized: true,
+    });
+
+    await run(params);
+
+    expect(runnerArgs().question).toBe(
+      "why does this fail?\n\nError: ENOSPC\n    at write (app.js:3:5)",
+    );
+  });
 });
