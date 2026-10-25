@@ -93,10 +93,7 @@ for provider examples and precedence.
 - `tools.agentToAgent.send`: optional outgoing target agent IDs or `*` patterns for `sessions_send`. Omit to keep global policy and visibility checks; `[]` denies ordinary cross-agent sends. Matches permit send-only access under narrow visibility without granting history, search, list, status, or session controls. Global agent-to-agent policy and sandbox clamps still apply; same-agent and requester-owned child rules are unchanged. See [send-only configuration](/gateway/config-tools/sessions-and-subagents#per-agent-send-only-access).
 - Sandbox inheritance guard: if the requester session is sandboxed, `sessions_spawn` rejects targets that would run unsandboxed.
 - `subagents.requireAgentId`: when true, block `sessions_spawn` calls that omit `agentId` (forces explicit profile selection; default: false).
-- `subagents.maxConcurrent`: max concurrent child-agent runs per immediate spawning/controller session. Default: `8`; independent sessions have independent budgets. Codex-native subagents use Codex's separate scheduler and limits.
-- `subagents.maxChildrenPerAgent`: separate admission limit on active children a single agent session can spawn. Default: `5`.
-- `subagents.maxSpawnDepth`: max nesting depth for sub-agent spawning (`1`-`5`). Default: `5`; set `1` to make direct children leaves.
-- `subagents.archiveAfterMinutes`: age before completed subagent state is archived. Default: `60`.
+- Subagent limits (`maxConcurrent`, `maxChildrenPerAgent`, `maxSpawnDepth`, `archiveAfterMinutes`) are not per-agent settings. Set them once under [`agents.defaults.subagents`](/gateway/config-tools/sessions-and-subagents#agents.defaults.subagents); an agent entry that sets them fails config validation.
 
 ---
 

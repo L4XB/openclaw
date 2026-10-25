@@ -107,7 +107,7 @@ Allowlist entry formats:
 - **Separate from `/exec`**: the `/exec` directive adjusts per-session exec defaults (host, security, ask, node) for authorized senders and does not require elevated mode.
 
 <Note>
-  The bash chat command (`!` prefix; `/bash` alias) is a separate gate that requires `tools.elevated` to be enabled in addition to its own `tools.bash.enabled` flag. Disabling elevated locks `!` shell commands out as well.
+  The bash chat command (`!` prefix; `/bash` alias) is a separate gate that requires `tools.elevated` to be enabled in addition to its own `commands.bash` setting. Disabling elevated locks `!` shell commands out as well.
 </Note>
 
 ## Related
