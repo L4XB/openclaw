@@ -318,7 +318,7 @@ export function markdownToWhatsAppChunks(
   const markdown = guardedIndent ? `${WHATSAPP_INDENT_GUARD}${protectedText}` : protectedText;
   const trailingWhitespace = text.match(/\s+$/u)?.[0] ?? "";
   const { ir: parsedIr, hasTables } = markdownToIRWithMeta(markdown, {
-    linkify: false,
+    linkify: true,
     autolink: false,
     enableSpoilers: true,
     enableHtmlUnderline: true,

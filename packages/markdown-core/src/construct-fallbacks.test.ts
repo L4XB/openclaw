@@ -71,6 +71,17 @@ describe("applyConstructFallbacks", () => {
     });
   });
 
+  it("adds no suffix to linkified URLs whose href only differs by encoding", () => {
+    const ir = markdownToIR(
+      "See https://de.wikipedia.org/wiki/Größe, https://münchen.de/rathaus and [docs](https://example.com)",
+      { linkify: true },
+    );
+
+    expect(project(ir, { linkLabel: "fallback" }).text).toBe(
+      "See https://de.wikipedia.org/wiki/Größe, https://münchen.de/rathaus and docs (https://example.com)",
+    );
+  });
+
   it("merges heading fallback with authored bold and respects stripped bold", () => {
     const ir = makeIR("Title", [style(0, 5, "heading_1"), style(0, 5, "bold")]);
     expect(project(ir, { heading: "fallback" }).styles).toEqual([style(0, 5, "bold")]);

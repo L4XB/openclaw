@@ -40,6 +40,22 @@ describe("WhatsApp text runtime", () => {
     expect(markdownToWhatsApp(input)).toBe(expected);
   });
 
+  it.each([
+    [
+      "The bug is in https://github.com/psf/requests/blob/main/src/requests/__init__.py (line 12).",
+      "The bug is in https://github.com/psf/requests/blob/main/src/requests/__init__.py (line 12).",
+    ],
+    [
+      "See https://docs.python.org/3/library/__main__.html and https://example.com/*star*/path",
+      "See https://docs.python.org/3/library/__main__.html and https://example.com/*star*/path",
+    ],
+    ["Read https://de.wikipedia.org/wiki/Größe", "Read https://de.wikipedia.org/wiki/Größe"],
+    ["Check README.md and example.com", "Check README.md and example.com"],
+    ["**Read** [the docs](https://example.com/a_b)", "*Read* the docs (https://example.com/a_b)"],
+  ] as const)("keeps bare URL %j as written", (input, expected) => {
+    expect(markdownToWhatsApp(input)).toBe(expected);
+  });
+
   const table = "| Name | Value |\n| --- | --- |\n| A | 1 |";
   const codeTable = "```\n| Name | Value |\n| ---- | ----- |\n| A    | 1     |\n```";
   it.each([

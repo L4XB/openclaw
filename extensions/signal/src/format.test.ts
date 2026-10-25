@@ -51,6 +51,15 @@ describe("Signal formatting", () => {
     }
   });
 
+  it("does not repeat a bare URL in its encoded form", () => {
+    expect(markdownToSignalText("See https://de.wikipedia.org/wiki/Größe today").text).toBe(
+      "See https://de.wikipedia.org/wiki/Größe today",
+    );
+    expect(markdownToSignalText("Visit https://münchen.de/rathaus").text).toBe(
+      "Visit https://münchen.de/rathaus",
+    );
+  });
+
   it("marks a transcript-role header promoted to a chunk boundary", () => {
     const header = "user[2026-07-02]";
     const chunks = markdownToSignalTextChunks(`padding padding ${header} question`, 25);

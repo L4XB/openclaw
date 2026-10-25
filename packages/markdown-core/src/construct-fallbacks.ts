@@ -3,6 +3,7 @@ import { copyHtmlTags } from "./ir-metadata.js";
 import { sliceMarkdownIRRanges } from "./ir-slice.js";
 import {
   createStyleSpan,
+  isAutoLinkedMarkdownLink,
   mergeAnnotationSpans,
   mergeStyleSpans,
   type MarkdownStyle,
@@ -117,6 +118,10 @@ export function applyConstructFallbacks(
     linkSupport === "native" || linkSupport === "strip"
       ? []
       : listProjected.links.flatMap((link) => {
+          // A linkified URL already shows its address; its href only differs by encoding.
+          if (isAutoLinkedMarkdownLink(link)) {
+            return [];
+          }
           const href = link.href.trim();
           const label = listProjected.text.slice(link.start, link.end).trim();
           const comparableHref = href.startsWith("mailto:") ? href.slice("mailto:".length) : href;
