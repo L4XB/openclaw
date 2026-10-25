@@ -61,6 +61,29 @@ describe("chunkDiscordText", () => {
     expect(chunks.at(-1)).toContain("Done.");
   });
 
+  it("starts the next message with a line that does not fit the rest of this one", () => {
+    const story = "Keep reading for the twist. ".repeat(70).trim();
+    const ending =
+      "Ending (spoiler): ||the butler is innocent and the narrator poisoned the tea himself||";
+
+    expect(split(`${story}\n${ending}`)).toEqual([story, ending]);
+  });
+
+  it("keeps code lines whole across chunks", () => {
+    const rows = Array.from(
+      { length: 12 },
+      (_, i) =>
+        `INSERT INTO orders (id, customer_id, status, total_cents, currency, carrier, created_at) VALUES (${1000 + i}, ${50 + i}, 'shipped', 2076, 'EUR', 'DHL Express', '2026-10-21 10:00:00+00');`,
+    );
+    const chunks = split(`\`\`\`sql\n${rows.join("\n")}\n\`\`\`\n\nRun it once.`);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    const delivered = chunks.flatMap((chunk) => chunk.split("\n"));
+    for (const row of rows) {
+      expect(delivered).toContain(row);
+    }
+  });
+
   it("keeps chunks within maxChars when a closing fence line carries trailing text", () => {
     // Reserve closing-fence space even when the closing line has a long tail.
     for (let pad = 1990; pad <= 2000; pad++) {

@@ -137,6 +137,15 @@ function chunkDiscordText(text: string, opts: ChunkDiscordTextOpts = {}): string
     const fence = candidateFence?.reopenLine ? candidateFence : null;
     const charLimit = maxChars - (fence ? fence.closeLine.length + 1 : 0);
     const lineLimit = Math.max(1, maxLines - (fence ? 1 : 0));
+    // A line that does not fit the rest of this message starts the next one when it fits there whole.
+    const reopenLength = fence?.reopenLine ? fence.reopenLine.length + 1 : 0;
+    if (
+      current &&
+      reopenLength + line.length <= charLimit &&
+      !fits({ start: current.start, end: lineStart + line.length })
+    ) {
+      current = flush(current);
+    }
     const content = current ? raw(current) : (ranges.fenceAt(consumed)?.reopenLine ?? "");
     // An original closer consumes its reservation; splitting it first would turn markers into code.
     const segmentLimit =
