@@ -87,7 +87,7 @@ import {
   resolveBedrockPromptCachePolicy,
   type BedrockOptions,
 } from "./bedrock-options.js";
-import { userTurnContent } from "./converse-turns.js";
+import { addMessageCachePoints, userTurnContent, type VolatileStart } from "./converse-turns.js";
 import {
   isClaude5BedrockModel,
   resolveBedrockClaudeThinkingProfile,
@@ -842,7 +842,7 @@ function convertMessages(
   cachePoint: CachePointBlock | undefined,
 ): Message[] {
   const result: Message[] = [];
-  let firstVolatileMessageIndex: number | undefined;
+  let volatileStart: VolatileStart | undefined;
   const transformedMessages = transformMessages(context.messages, model, normalizeToolCallId);
 
   for (let i = 0; i < transformedMessages.length; i++) {
@@ -860,8 +860,8 @@ function convertMessages(
         const volatileRuntimeContext =
           hasRuntimeContextMarker(m) && !bindsClaudeThinkingPrefix(model);
         const turnContent = userTurnContent(result);
-        if (volatileRuntimeContext && firstVolatileMessageIndex === undefined) {
-          firstVolatileMessageIndex = result.length - 1;
+        if (volatileRuntimeContext && volatileStart === undefined) {
+          volatileStart = { message: result.length - 1, block: turnContent.length };
         }
         turnContent.push(...content);
         break;
@@ -1005,19 +1005,8 @@ function convertMessages(
     }
   }
 
-  // Cache points include their entire prefix, so none may follow transient runtime context.
   if (cachePoint && result.at(-1)?.role === ConversationRole.USER) {
-    // Keep the prior checkpoint reachable when a new turn exceeds AWS's 20-block lookback.
-    let remaining = 2;
-    for (let index = (firstVolatileMessageIndex ?? result.length) - 1; index >= 0; index--) {
-      const message = result[index];
-      if (message?.role === ConversationRole.USER && message.content) {
-        message.content.push({ cachePoint });
-        if (--remaining === 0) {
-          break;
-        }
-      }
-    }
+    addMessageCachePoints(result, cachePoint, volatileStart);
   }
 
   return result;

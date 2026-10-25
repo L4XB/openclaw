@@ -7,15 +7,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   bedrockModel,
   capturePayload as captureCommandInput,
+  checkpoint,
   collectStream,
   expectDestroyedClient,
   mockResponse,
   mockStream,
   png,
   replayAssistant,
+  runtimeUser,
   startEvent as startMessage,
   stopEvent as stopMessage,
   streamBedrockForTest,
+  textBlock,
   toolStart,
   toolDelta,
   textDelta,
@@ -224,6 +227,35 @@ it("joins a user turn that follows tool results into the tool-result message", a
   expect(input.messages?.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
   expect(input.messages?.[2]?.content?.filter((block) => !block.cachePoint)).toEqual([
     { toolResult: expect.objectContaining({ toolUseId: "call_logs" }) },
+    { text: "also check the database" },
+  ]);
+});
+
+it("keeps the tool results cached in front of a steering turn that joins them", async () => {
+  const model = bedrockModel({ id: "anthropic.claude-haiku-4-5-20251001-v1:0", name: "Claude" });
+  const context = {
+    messages: [
+      { role: "user", content: "check the logs", timestamp: 0 },
+      {
+        ...replayAssistant(model.id, [
+          { type: "toolCall", id: "call_logs", name: "read", arguments: { path: "app.log" } },
+        ]),
+        timestamp: 1,
+      },
+      { ...toolResult("call_logs", [{ type: "text", text: "no errors" }], "read"), timestamp: 2 },
+      runtimeUser(
+        ["OpenClaw runtime context:\nsteering turn", "also check the database"].map(textBlock),
+        3,
+      ),
+    ],
+  } as never;
+  const input = await captureCommandInput(model, context, { cacheRetention: "short" });
+  expect(input.messages?.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+  expect(input.messages?.[0]?.content?.at(-1)).toEqual(checkpoint);
+  expect(input.messages?.[2]?.content).toEqual([
+    { toolResult: expect.objectContaining({ toolUseId: "call_logs" }) },
+    checkpoint,
+    { text: "OpenClaw runtime context:\nsteering turn" },
     { text: "also check the database" },
   ]);
 });
