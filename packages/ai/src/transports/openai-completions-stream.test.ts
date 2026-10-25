@@ -81,6 +81,31 @@ describe("openai completions stream", () => {
     },
   );
 
+  it("reads Groq's streamed usage from x_groq on the final chunk", async () => {
+    const model = makeCompletionsModel({
+      provider: "groq",
+      id: "openai/gpt-oss-120b",
+      baseUrl: "https://api.groq.com/openai/v1",
+    });
+    const { output, run } = streamFixture(model);
+    await run([
+      makeCompletionsChunk({ role: "assistant", content: "Hello! How can I help?" }),
+      {
+        ...makeCompletionsChunk({}, "stop"),
+        x_groq: {
+          id: "req_01",
+          usage: {
+            prompt_tokens: 81,
+            completion_tokens: 23,
+            total_tokens: 104,
+            prompt_tokens_details: { cached_tokens: 64 },
+          },
+        },
+      },
+    ]);
+    expect(output.usage).toMatchObject({ input: 17, output: 23, cacheRead: 64, totalTokens: 104 });
+  });
+
   it.each([false, true])(
     "publishes cumulative tool input before execution (direct=%s)",
     async (direct) => {

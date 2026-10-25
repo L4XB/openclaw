@@ -59,6 +59,8 @@ type OpenAICompatibleChatCompletionChunk = Omit<ChatCompletionChunk, "choices"> 
     message?: ChatCompletionChunk["choices"][number]["delta"];
   })[];
   timings?: { prompt_ms?: number; predicted_ms?: number };
+  // Groq streams usage in x_groq.usage on the final chunk.
+  x_groq?: { usage?: ChatCompletionChunk["usage"] };
 };
 
 function extractToolCallThoughtSignature(toolCall: unknown): string | undefined {
@@ -87,7 +89,7 @@ export async function* observeOpenAICompletionsProgress<
     if (rawChunk && typeof rawChunk === "object") {
       const chunk = rawChunk as OpenAICompatibleChatCompletionChunk;
       const choice = Array.isArray(chunk.choices) ? chunk.choices[0] : undefined;
-      const usage = chunk.usage || choice?.usage;
+      const usage = chunk.usage || choice?.usage || chunk.x_groq?.usage;
       let hasUsageProgress = false;
       // Cumulative snapshots can repeat or regress; billing metadata is not model work.
       for (const [counter, reported] of [
@@ -417,7 +419,7 @@ export async function processCompletionsStream(
       output.responseModel ||= chunk.model;
     }
     const choice = Array.isArray(chunk.choices) ? chunk.choices[0] : undefined;
-    const usage = chunk.usage || choice?.usage;
+    const usage = chunk.usage || choice?.usage || chunk.x_groq?.usage;
     // llama.cpp attaches final timings to the usage-only chunk when requested.
     if (
       chunk.timings !== undefined &&
