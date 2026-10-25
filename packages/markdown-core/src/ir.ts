@@ -13,6 +13,7 @@ import {
 import { chunkText } from "./chunk-text.js";
 import { matchMarkdownHtmlTag, tokenizeHtmlTags } from "./html-tags.js";
 import { appendAssistantTranscriptRoleText, appendImageAlternative } from "./ir-annotations.js";
+import { resolveBlockquoteEnd } from "./ir-blockquote.js";
 import {
   appendHtmlTags,
   attachBlockMetadata,
@@ -1053,11 +1054,7 @@ function renderTokens(tokens: MarkdownToken[], state: RenderState): void {
         break;
       case "blockquote_close": {
         const blockquote = state.blockquoteStack.pop();
-        const end = Math.max(
-          blockquote?.start ?? 0,
-          state.text.endsWith("\n\n") ? state.text.length - 2 : state.text.length,
-          (state.collectedTables.at(-1)?.placeholderOffset ?? -1) + 1,
-        );
+        const end = resolveBlockquoteEnd(state, blockquote?.start ?? 0);
         closeStyle(state, "blockquote", end);
         if (blockquote) {
           state.blocks.push({ kind: "blockquote", ...blockquote, end });

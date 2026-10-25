@@ -186,6 +186,23 @@ it("retains zero-length blockquote ownership", () => {
   expect(sliceMarkdownIR(withText, 0, withText.text.length).blocks).toBeUndefined();
 });
 
+it("keeps a code block that ends a quote inside the quote", () => {
+  for (const source of [
+    "> I tried this:\n>\n> ```bash\n> npm test --watch\n> ```\n\nafter",
+    "> ```python\n> print(total / count)\n> ```\n\nafter",
+    ">     indented code\n\nafter",
+  ]) {
+    const { styles } = markdownToIR(source);
+    const quote = styles.find((span) => span.style === "blockquote");
+    const code = styles.find((span) => span.style === "code_block");
+
+    expect(quote).toBeDefined();
+    expect(code).toBeDefined();
+    expect(quote?.start).toBeLessThanOrEqual(code?.start ?? 0);
+    expect(quote?.end).toBeGreaterThanOrEqual(code?.end ?? 0);
+  }
+});
+
 it("retains CommonMark content indentation after wide marker padding", () => {
   const source = "-     code";
   const item = markdownToIR(source).listItems?.[0];

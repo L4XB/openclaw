@@ -30,6 +30,23 @@ describe("Telegram formatting", () => {
     expect(chunkHtml(promotedHtml)).toEqual([protectedHtml]);
   });
 
+  it("keeps a code block that ends a quote inside the quote", () => {
+    expect(
+      markdownToTelegramHtml(
+        "Your snippet:\n\n> I tried this:\n>\n> ```bash\n> npm test --watch\n> ```\n\nThe flag is `--watchAll` in Jest 29.",
+      ),
+    ).toBe(
+      'Your snippet:\n\n<blockquote>I tried this:\n\n<pre><code class="language-bash">npm test --watch\n</code></pre></blockquote>\nThe flag is <code>--watchAll</code> in Jest 29.',
+    );
+    expect(
+      markdownToTelegramHtml(
+        "You wrote:\n\n> ```python\n> print(total / count)\n> ```\n\nGuard `count == 0` first.",
+      ),
+    ).toBe(
+      'You wrote:\n\n<blockquote><pre><code class="language-python">print(total / count)\n</code></pre></blockquote>\nGuard <code>count == 0</code> first.',
+    );
+  });
+
   it("preserves supported Telegram HTML in stream markdown rendering", () => {
     const input = [
       "✉️ <b>Morning Email Rollup</b>",
