@@ -14,6 +14,11 @@ describe("SMS phone normalization", () => {
     expect(normalizeSmsAllowFrom("*")).toBe("*");
   });
 
+  it("keeps access group references in allowFrom", () => {
+    expect(normalizeSmsAllowFrom("accessGroup:family")).toBe("accessGroup:family");
+    expect(normalizeSmsAllowFrom(" accessGroup: family ")).toBe("accessGroup:family");
+  });
+
   it("validates E.164-ish SMS targets", () => {
     expect(looksLikeSmsPhoneNumber("+15551234567")).toBe(true);
     expect(looksLikeSmsPhoneNumber("15551234567")).toBe(true);

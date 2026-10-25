@@ -186,6 +186,19 @@ describe("SMS account config", () => {
     expect(resolveSmsAccount(config(parsed))).toMatchObject({ allowFrom: ["+15551234567"] });
   });
 
+  it("keeps access group references next to phone numbers in allowFrom", () => {
+    const parsed = parseSmsConfig({
+      accountSid: "AC123",
+      authToken: "token",
+      fromNumber: "+15550001111",
+      allowFrom: ["accessGroup:family", "+1 (555) 222-3333"],
+    });
+
+    expect(resolveSmsAccount(config(parsed))).toMatchObject({
+      allowFrom: ["accessGroup:family", "+15552223333"],
+    });
+  });
+
   it.each([
     ["standalone", sender, {}, false],
     ["implicit default with named accounts", { ...sender, accounts }, {}, true],

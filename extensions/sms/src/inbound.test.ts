@@ -223,6 +223,35 @@ describe("dispatchSmsInboundEvent", () => {
     expect(turn.route.sessionKey).toBe(SMS_SESSION_KEY);
   });
 
+  it("admits access group members written in any phone number format", async () => {
+    const mocks = createAuthorizedRuntime();
+    mocks.buildContext.mockReturnValue({ SessionKey: SMS_SESSION_KEY });
+    const familyMembers = (member: string) => ({
+      family: { type: "message.senders" as const, members: { sms: [member] } },
+    });
+    const msg = {
+      from: SMS_FROM,
+      to: SMS_TO,
+      body: "hello",
+      messageSid: "SM-group",
+      accountSid: "AC123",
+      media: [],
+    };
+    const account = createAccount({ dmPolicy: "allowlist", allowFrom: ["accessGroup:family"] });
+
+    await dispatch(mocks.runtime, msg, {
+      cfg: { accessGroups: familyMembers("+1 (555) 123-4567") },
+      account,
+    });
+    expect(mocks.run).toHaveBeenCalledOnce();
+
+    await dispatch(mocks.runtime, msg, {
+      cfg: { accessGroups: familyMembers("+15559998888") },
+      account,
+    });
+    expect(mocks.run).toHaveBeenCalledOnce();
+  });
+
   it("downloads authorized MMS media with Twilio auth and exposes media facts", async () => {
     const mocks = createAuthorizedRuntime();
     mocks.buildContext.mockReturnValue({ SessionKey: SMS_SESSION_KEY });

@@ -1,3 +1,5 @@
+import { parseAccessGroupAllowFromEntry } from "openclaw/plugin-sdk/access-groups";
+
 export function normalizeSmsPhoneNumber(raw: string): string {
   const trimmed = raw
     .trim()
@@ -16,8 +18,13 @@ export function looksLikeSmsPhoneNumber(raw: string): boolean {
 }
 
 export function normalizeSmsAllowFrom(raw: string): string {
-  if (raw.trim() === "*") {
+  const trimmed = raw.trim();
+  if (trimmed === "*") {
     return "*";
+  }
+  const accessGroup = parseAccessGroupAllowFromEntry(trimmed);
+  if (accessGroup) {
+    return `accessGroup:${accessGroup}`;
   }
   return normalizeSmsPhoneNumber(raw);
 }

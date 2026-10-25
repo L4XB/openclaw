@@ -2,7 +2,7 @@ import type { ChannelIngressContextBinding } from "openclaw/plugin-sdk/channel-i
 import { createChannelPairingChallengeIssuer } from "openclaw/plugin-sdk/channel-pairing";
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import type { PluginRuntime } from "openclaw/plugin-sdk/plugin-runtime";
-import { normalizeSmsPhoneNumber } from "./phone.js";
+import { normalizeSmsAllowFrom, normalizeSmsPhoneNumber } from "./phone.js";
 import { sendSmsTextChunks } from "./send.js";
 import type { ResolvedSmsAccount, SmsInboundMessage } from "./types.js";
 
@@ -41,6 +41,8 @@ export async function dispatchSmsInboundEvent(params: {
       identity: {
         key: "phone",
         entryIdPrefix: "sms-entry",
+        // Access group members follow the same number rules as allowFrom entries.
+        normalize: normalizeSmsAllowFrom,
       },
       readStoreAllowFrom: async () =>
         await channelRuntime.pairing.readAllowFromStore({
