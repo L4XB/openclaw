@@ -10,11 +10,13 @@ import {
 import { captureEffectAuthority } from "openclaw/plugin-sdk/fetch-runtime";
 import { resolveMarkdownTableMode } from "openclaw/plugin-sdk/markdown-table-runtime";
 import { requireRuntimeConfig } from "openclaw/plugin-sdk/plugin-config-runtime";
+import { normalizeLowercaseStringOrEmpty } from "openclaw/plugin-sdk/string-coerce-runtime";
 import { convertMarkdownTables, stripMarkdown } from "openclaw/plugin-sdk/text-chunking";
 import { resolveIrcAccount } from "./accounts.js";
 import { connectIrcClient } from "./client.js";
 import { buildIrcConnectOptions } from "./connect-options.js";
-import { normalizeIrcMessagingTarget } from "./normalize.js";
+import { getLiveIrcClient } from "./live-client-registry.js";
+import { isChannelTarget, normalizeIrcMessagingTarget } from "./normalize.js";
 import { getOptionalIrcRuntime } from "./runtime.js";
 import type { CoreConfig } from "./types.js";
 
@@ -76,17 +78,27 @@ export async function sendIrcMessages(
   const messages = planMessages(prepared);
   opts.abortSignal?.throwIfAborted();
 
-  const client = await connectIrcClient(
-    buildIrcConnectOptions(account, {
-      connectTimeoutMs: 12000,
-      abortSignal: opts.abortSignal,
-    }),
-  );
+  // Reuse the Gateway monitor's connection for DMs and the channels it joined, so the message comes
+  // from the bot's nick. Other channels keep a short connection that joins, sends and quits.
+  const isChannel = isChannelTarget(target);
+  const liveClient = getLiveIrcClient(account.accountId);
+  const sharedClient =
+    liveClient && (!isChannel || isMonitorChannel(account.config.channels, target))
+      ? liveClient
+      : undefined;
+  const client =
+    sharedClient ??
+    (await connectIrcClient(
+      buildIrcConnectOptions(account, {
+        connectTimeoutMs: 12000,
+        abortSignal: opts.abortSignal,
+      }),
+    ));
 
   const results: SendIrcResult[] = [];
   try {
     opts.abortSignal?.throwIfAborted();
-    if (target.startsWith("#") || target.startsWith("&")) {
+    if (isChannel && !sharedClient) {
       await effect.initiate(() => {
         opts.abortSignal?.throwIfAborted();
         if (!client.isReady()) {
@@ -153,8 +165,15 @@ export async function sendIrcMessages(
       visibleReplySent: true,
     });
   } finally {
-    client.quit("sent");
+    if (!sharedClient) {
+      client.quit("sent");
+    }
   }
+}
+
+function isMonitorChannel(channels: readonly string[] | undefined, target: string): boolean {
+  const wanted = normalizeLowercaseStringOrEmpty(target);
+  return (channels ?? []).some((channel) => normalizeLowercaseStringOrEmpty(channel) === wanted);
 }
 
 export async function sendMessageIrc(

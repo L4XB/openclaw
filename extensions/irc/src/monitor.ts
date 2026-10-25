@@ -39,6 +39,7 @@ import {
   type IrcIngressLifecycle,
   type IrcIngressMonitor,
 } from "./irc-ingress.js";
+import { registerLiveIrcClient, unregisterLiveIrcClient } from "./live-client-registry.js";
 import { normalizeIrcAllowEntry } from "./normalize.js";
 import { sanitizeIrcAssistantText } from "./outbound-base.js";
 import { resolveIrcGroupMatch, resolveIrcGroupRequireMention } from "./policy.js";
@@ -512,6 +513,9 @@ export async function monitorIrcProvider(
           if (activeConnectionEpoch === ingressConnection.connectionEpoch) {
             activeConnectionEpoch = null;
           }
+          if (client) {
+            unregisterLiveIrcClient(account.accountId, client);
+          }
           client = null;
           opts.statusSink?.({ lastDisconnect: { at: Date.now() } });
           const delayMs = scheduleReconnect();
@@ -553,6 +557,7 @@ export async function monitorIrcProvider(
     }
     ingress.start();
     reconnectBackoff.markConnected();
+    registerLiveIrcClient(account.accountId, nextClient);
     opts.statusSink?.(channelReadyPatch());
 
     logger.info(
@@ -578,6 +583,9 @@ export async function monitorIrcProvider(
         if (reconnectTimer) {
           clearTimeout(reconnectTimer);
           reconnectTimer = null;
+        }
+        if (client) {
+          unregisterLiveIrcClient(account.accountId, client);
         }
         client?.quit("shutdown");
         client = null;

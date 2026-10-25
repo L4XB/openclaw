@@ -16,6 +16,7 @@ import { createIrcIngressMonitor } from "./irc-ingress.js";
 import { onIrcTestLine, startIrcTestServer } from "./irc-server.test-support.js";
 import { monitorIrcProvider } from "./monitor.js";
 import { setIrcRuntime } from "./runtime.js";
+import { sendMessageIrc } from "./send.js";
 import type { CoreConfig, IrcInboundMessage } from "./types.js";
 
 type IrcIngressQueue = NonNullable<Parameters<typeof createIrcIngressMonitor>[0]["queue"]>;
@@ -654,6 +655,29 @@ describe("irc monitor inbound target", () => {
       } finally {
         enqueueSpy.mockRestore();
       }
+    });
+  });
+
+  it("sends DMs and channel messages from the monitor's connection", async () => {
+    await withIngressQueue(async (ingressQueue, _stateDir, resources) => {
+      installMonitorRuntime();
+      const server = await resources.server(startMonitorServer());
+      const config = monitorConfig(server.port, "bot", { channels: ["#openclaw"] });
+      await resources.monitor({ config, ingressQueue, onMessage: vi.fn() });
+      await withTimeout(server.joined, 3000, "monitor join");
+
+      await sendMessageIrc("#openclaw", "Deploy finished", { cfg: config });
+      await sendMessageIrc("alice", "Your report is ready", { cfg: config });
+
+      await vi.waitFor(() =>
+        expect(server.linesByConnection[0]).toEqual(
+          expect.arrayContaining([
+            "PRIVMSG #openclaw :Deploy finished",
+            "PRIVMSG alice :Your report is ready",
+          ]),
+        ),
+      );
+      expect(server.connectionCount).toBe(1);
     });
   });
 });

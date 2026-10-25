@@ -28,6 +28,7 @@ vi.mock("openclaw/plugin-sdk/text-chunking", async (original) => ({
 }));
 
 import { ircPlugin } from "./channel.js";
+import { registerLiveIrcClient, unregisterLiveIrcClient } from "./live-client-registry.js";
 import { ircOutboundBaseAdapter } from "./outbound-base.js";
 import { probeIrc } from "./probe.js";
 import { sendIrcMessages, sendMessageIrc } from "./send.js";
@@ -414,6 +415,50 @@ describe("IRC outbound and probing", () => {
       ok: false,
       ...address,
       error: JSON.stringify({ code: "ECONNREFUSED" }),
+    });
+  });
+
+  describe("while the Gateway monitor is connected", () => {
+    const monitorCfg: CoreConfig = { channels: { irc: { ...address, channels: ["#ops"] } } };
+    function connectMonitor() {
+      const monitor = {
+        nick: "openclaw",
+        isReady: vi.fn(() => true),
+        join: vi.fn(),
+        sendPrivmsg: vi.fn(),
+        quit: vi.fn(),
+        close: vi.fn(),
+      } satisfies IrcClient;
+      registerLiveIrcClient("default", monitor);
+      onTestFinished(() => unregisterLiveIrcClient("default", monitor));
+      return monitor;
+    }
+
+    it("sends DMs and messages to its channels from the monitor's connection", async () => {
+      const monitor = connectMonitor();
+
+      await sendMessageIrc("#OPS", "Deploy finished", { cfg: monitorCfg });
+      await sendMessageIrc("alice", "Your report is ready", { cfg: monitorCfg });
+
+      expect(monitor.sendPrivmsg.mock.calls).toEqual([
+        ["#OPS", "Deploy finished", undefined],
+        ["alice", "Your report is ready", undefined],
+      ]);
+      expect(monitor.join).not.toHaveBeenCalled();
+      expect(monitor.quit).not.toHaveBeenCalled();
+      expect(mocks.connectIrcClient).not.toHaveBeenCalled();
+    });
+
+    it("joins any other channel on a connection of its own", async () => {
+      const monitor = connectMonitor();
+
+      await sendMessageIrc("#other", "hello", { cfg: monitorCfg });
+
+      expect(mocks.connectIrcClient).toHaveBeenCalledTimes(1);
+      expect(client.join).toHaveBeenCalledWith("#other");
+      expect(client.sendPrivmsg).toHaveBeenCalledWith("#other", "hello", undefined);
+      expect(client.quit).toHaveBeenCalledWith("sent");
+      expect(monitor.sendPrivmsg).not.toHaveBeenCalled();
     });
   });
 });
