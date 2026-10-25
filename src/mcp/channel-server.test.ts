@@ -219,6 +219,9 @@ describe("openclaw channel mcp server", () => {
         ...attachments,
         { type: "openclaw_media", media: { ...media, transcribed: false } },
       ]);
+      expect((result.content as Array<{ text?: string }>)[0]?.text).toContain(
+        '"url": "media://inbound/photo.png"',
+      );
       expect(gatewayRequest).toHaveBeenCalledWith("chat.message.get", {
         sessionKey: "agent:main:main",
         messageId: "media-1",
@@ -332,6 +335,42 @@ describe("openclaw channel mcp server", () => {
       expect(gatewayRequest.mock.calls).toEqual(expectedCalls);
     },
   );
+
+  test("mirrors structured results as JSON text for clients that read only content", async () => {
+    const mcp = await connectMcpWithoutGateway();
+    attachReadyGateway(
+      mcp.bridge,
+      gatewayResponses({
+        "sessions.describe": {
+          session: {
+            key: "agent:main:main",
+            deliveryContext: { channel: "telegram", to: "-100123" },
+          },
+        },
+      }),
+    );
+    await mcp.receive(userMessage("ping from the channel", { messageId: "msg-text-1" }));
+    await (
+      mcp.bridge as unknown as { handleGatewayEvent: (event: unknown) => Promise<void> }
+    ).handleGatewayEvent({
+      type: "event",
+      event: "exec.approval.requested",
+      payload: { id: "approval-9", request: { command: "git push" }, createdAtMs: Date.now() },
+    });
+    const text = (result: unknown) =>
+      (result as { content?: Array<{ text?: string }> }).content?.[0]?.text ?? "";
+
+    expect(text(await mcp.call("events_poll", { after_cursor: 0 }))).toContain(
+      '"text": "ping from the channel"',
+    );
+    expect(text(await mcp.call("events_wait", { after_cursor: 0, timeout_ms: 250 }))).toContain(
+      '"messageId": "msg-text-1"',
+    );
+    expect(text(await mcp.call("permissions_list_open", {}))).toContain('"id": "approval-9"');
+    expect(text(await mcp.call("conversation_get", { session_key: "agent:main:main" }))).toContain(
+      '"to": "-100123"',
+    );
+  });
 
   test("rejects oversized limits and timeouts at the MCP input boundary", async () => {
     const mcp = await connectMcpWithoutGateway();

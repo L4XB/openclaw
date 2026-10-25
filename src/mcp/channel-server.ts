@@ -9,7 +9,7 @@ import {
   ClaudePermissionRequestSchema,
   type ClaudeChannelMode,
   extractAttachmentsFromMessage,
-  summarizeResult,
+  structuredTextResult,
   summarizeStructuredResult,
   toText,
 } from "./channel-shared.js";
@@ -98,10 +98,7 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
           isError: true,
         };
       }
-      return {
-        content: [{ type: "text", text: `conversation ${conversation.sessionKey}` }],
-        structuredContent: { conversation },
-      };
+      return structuredTextResult(`conversation ${conversation.sessionKey}`, { conversation });
     },
   );
 
@@ -138,10 +135,7 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
         };
       }
       const attachments = extractAttachmentsFromMessage(message);
-      return {
-        ...summarizeResult("attachments", attachments.length),
-        structuredContent: { attachments, message },
-      };
+      return summarizeStructuredResult("attachments", attachments.length, { attachments, message });
     },
   );
 
@@ -160,14 +154,11 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
         { afterCursor: after_cursor ?? 0, sessionKey: toText(session_key) },
         limit,
       );
-      return {
-        ...summarizeResult("events", events.length),
-        structuredContent: {
-          events,
-          next_cursor: nextCursor,
-          ...(gap ? { gap } : {}),
-        },
-      };
+      return summarizeStructuredResult("events", events.length, {
+        events,
+        next_cursor: nextCursor,
+        ...(gap ? { gap } : {}),
+      });
     },
   );
 
@@ -187,19 +178,14 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
         timeout_ms,
         extra.mcpReq.signal,
       );
-      return {
-        content: [
-          {
-            type: "text",
-            text: event
-              ? `event ${event.cursor}`
-              : gap
-                ? `event gap before ${gap.oldest_available_cursor}`
-                : "timeout",
-          },
-        ],
-        structuredContent: { event, ...(gap ? { gap } : {}) },
-      };
+      return structuredTextResult(
+        event
+          ? `event ${event.cursor}`
+          : gap
+            ? `event gap before ${gap.oldest_available_cursor}`
+            : "timeout",
+        { event, ...(gap ? { gap } : {}) },
+      );
     },
   );
 
@@ -214,10 +200,7 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
     },
     async ({ session_key, text }) => {
       const result = await bridge.sendMessage({ sessionKey: session_key, text });
-      return {
-        content: [{ type: "text", text: "sent" }],
-        structuredContent: { result },
-      };
+      return structuredTextResult("sent", { result });
     },
   );
 
@@ -230,10 +213,7 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
     },
     async () => {
       const approvals = bridge.listPendingApprovals();
-      return {
-        ...summarizeResult("approvals", approvals.length),
-        structuredContent: { approvals },
-      };
+      return summarizeStructuredResult("approvals", approvals.length, { approvals });
     },
   );
 
@@ -249,10 +229,7 @@ export async function serveOpenClawChannelMcp(opts: OpenClawMcpServeOptions = {}
     },
     async ({ kind, id, decision }) => {
       const result = await bridge.respondToApproval({ kind, id, decision });
-      return {
-        content: [{ type: "text", text: "approval resolved" }],
-        structuredContent: { result },
-      };
+      return structuredTextResult("approval resolved", { result });
     },
   );
   const transport = new StdioServerTransport();

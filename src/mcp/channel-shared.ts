@@ -153,22 +153,21 @@ export const ClaudePermissionRequestSchema = z.object({
 
 export { toText };
 
-export function summarizeResult(
-  label: string,
-  count: number,
-): { content: Array<{ type: "text"; text: string }> } {
-  return {
-    content: [{ type: "text", text: `${label}: ${count}` }],
-  };
-}
-
 export function summarizeStructuredResult<T extends Record<string, unknown>>(
   label: string,
   count: number,
   payload: T,
 ): { content: Array<{ type: "text"; text: string }>; structuredContent: T } {
+  return structuredTextResult(`${label}: ${count}`, payload);
+}
+
+/** Mirrors structured content as JSON text for clients that read only `content` (MCP 2025-06-18). */
+export function structuredTextResult<T extends Record<string, unknown>>(
+  summary: string,
+  payload: T,
+): { content: Array<{ type: "text"; text: string }>; structuredContent: T } {
   return {
-    content: [{ type: "text", text: `${label}: ${count}\n\n${JSON.stringify(payload, null, 2)}` }],
+    content: [{ type: "text", text: `${summary}\n\n${JSON.stringify(payload, null, 2)}` }],
     structuredContent: payload,
   };
 }
