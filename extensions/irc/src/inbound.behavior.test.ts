@@ -1,4 +1,5 @@
 // Irc tests cover inbound.behavior plugin behavior.
+import { buildMentionRegexes, matchesMentionPatterns } from "openclaw/plugin-sdk/channel-inbound";
 import { createPluginRuntimeMock } from "openclaw/plugin-sdk/channel-test-helpers";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedIrcAccount } from "./accounts.js";
@@ -370,6 +371,42 @@ describe("irc inbound behavior", () => {
       }
     },
   );
+
+  it.each([
+    {
+      label: "agent mentionPatterns",
+      agents: { entries: { main: { groupChat: { mentionPatterns: ["@openclaw", "openclaw"] } } } },
+      text: "openclaw: is the deploy done?",
+    },
+    {
+      label: "agent identity name",
+      agents: { entries: { main: { identity: { name: "Molty" } } } },
+      text: "molty, is the deploy done?",
+    },
+  ])("matches the routed agent's mention patterns: $label", async ({ agents, text }) => {
+    const coreRuntime = createPluginRuntimeMock();
+    coreRuntime.channel.mentions.buildMentionRegexes = buildMentionRegexes;
+    coreRuntime.channel.mentions.matchesMentionPatterns = matchesMentionPatterns;
+    setIrcRuntime(coreRuntime as never);
+
+    await receive({
+      message: createMessage({ target: "#ops", isGroup: true, text }),
+      account: createAccount({
+        nick: "oc-bot",
+        config: {
+          dmPolicy: "open",
+          allowFrom: ["*"],
+          groupPolicy: "open",
+          groupAllowFrom: [],
+          groups: { "#ops": { enabled: true, requireMention: true } },
+        },
+      }),
+      config: { agents, channels: { irc: {} } } as CoreConfig,
+      sendReply: vi.fn(async () => {}),
+    });
+
+    expect(coreRuntime.channel.inbound.dispatch).toHaveBeenCalledTimes(1);
+  });
 
   it("drops a spoofed sender for a host-less nick!user DM allowlist entry", async () => {
     const coreRuntime = createPluginRuntimeMock();

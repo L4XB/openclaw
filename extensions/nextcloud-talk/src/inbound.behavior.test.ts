@@ -1,6 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ChannelInboundTurnPlan } from "openclaw/plugin-sdk/channel-inbound";
+import {
+  buildMentionRegexes,
+  matchesMentionPatterns,
+  type ChannelInboundTurnPlan,
+} from "openclaw/plugin-sdk/channel-inbound";
 import {
   createPluginRuntimeMock,
   createTestRegistry,
@@ -368,6 +372,34 @@ describe("nextcloud-talk inbound behavior", () => {
         WasMentioned: false,
       },
     });
+  });
+
+  it("matches the routed agent's mention patterns in mention-gated rooms", async () => {
+    const coreRuntime = installCommandRuntime(() => false, {
+      buildMentionRegexes,
+      matchesMentionPatterns,
+    });
+    installPairingController(vi.fn(async () => []));
+    mocks.roomKind.mockResolvedValue("group");
+    const account = createAccount({
+      dmPolicy: "allowlist",
+      allowFrom: ["user-1"],
+      groupAllowFrom: ["user-1"],
+      rooms: { "room-1": { requireMention: true } },
+    });
+    const config = {
+      agents: { entries: { main: { groupChat: { mentionPatterns: ["\\bbert\\b"] } } } },
+      channels: { "nextcloud-talk": account.config },
+    } as CoreConfig;
+
+    await inbound({
+      message: createMessage({ text: "bert, is the deploy done?", isGroupChat: true }),
+      account,
+      config,
+    });
+
+    expect(coreRuntime.channel.inbound.dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatched(coreRuntime)).toMatchObject({ ctxPayload: { WasMentioned: true } });
   });
 
   it("sanitizes inbound replies while preserving native delivery fields", async () => {

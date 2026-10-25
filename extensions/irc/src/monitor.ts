@@ -227,7 +227,6 @@ export async function monitorIrcProvider(
         surface: CHANNEL_ID,
       });
       const hasControlCommand = core.channel.text.hasControlCommand(rawBody, cfg);
-      const mentionRegexes = core.channel.mentions.buildMentionRegexes(cfg);
       const mentionNick = context.connectedNick.trim() || account.nick;
       const explicitMentionRegex = mentionNick
         ? new RegExp(
@@ -235,9 +234,6 @@ export async function monitorIrcProvider(
             "i",
           )
         : null;
-      const wasMentioned =
-        core.channel.mentions.matchesMentionPatterns(rawBody, mentionRegexes) ||
-        (explicitMentionRegex ? explicitMentionRegex.test(rawBody) : false);
       const requireMention = message.isGroup
         ? resolveIrcGroupRequireMention({ groups: account.config.groups, target: message.target })
         : false;
@@ -265,6 +261,10 @@ export async function monitorIrcProvider(
           id: peerId,
         },
       });
+      const mentionRegexes = core.channel.mentions.buildMentionRegexes(cfg, route.agentId);
+      const wasMentioned =
+        core.channel.mentions.matchesMentionPatterns(rawBody, mentionRegexes) ||
+        (explicitMentionRegex ? explicitMentionRegex.test(rawBody) : false);
       const access = await core.channel.inbound.ingress
         .createResolver({
           channelId: CHANNEL_ID,

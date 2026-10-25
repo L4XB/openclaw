@@ -293,10 +293,6 @@ export async function handleNextcloudTalkInbound(params: {
     return;
   }
 
-  const mentionRegexes = core.channel.mentions.buildMentionRegexes(config as OpenClawConfig);
-  const wasMentioned = mentionRegexes.length
-    ? core.channel.mentions.matchesMentionPatterns(message.mentionText ?? rawBody, mentionRegexes)
-    : false;
   const route = resolveAgentRoute({
     cfg: config as OpenClawConfig,
     channel: CHANNEL_ID,
@@ -306,6 +302,13 @@ export async function handleNextcloudTalkInbound(params: {
       id: isGroup ? roomToken : senderId,
     },
   });
+  const mentionRegexes = core.channel.mentions.buildMentionRegexes(
+    config as OpenClawConfig,
+    route.agentId,
+  );
+  const wasMentioned = mentionRegexes.length
+    ? core.channel.mentions.matchesMentionPatterns(message.mentionText ?? rawBody, mentionRegexes)
+    : false;
   const contextBinding: ChannelIngressContextBinding = {
     agentId: route.agentId,
     sessionKey: route.sessionKey,
