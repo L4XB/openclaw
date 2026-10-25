@@ -48,8 +48,7 @@ export async function enrichMatrixFormattedContent(params: {
       }
     : renderMarkdownToMatrixHtmlWithMentions({ ...params, markdown }));
   params.content.body = body || params.content.body;
-  // Without m.mentions, Matrix still applies the legacy push rules that match display names,
-  // user IDs and @room in the body; an empty m.mentions notifies nobody.
+  // Empty metadata disables legacy push rules that match names and @room in the body.
   params.content["m.mentions"] = mentions ?? {};
   if (!html) {
     delete params.content.format;
