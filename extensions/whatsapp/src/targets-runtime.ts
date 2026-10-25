@@ -20,7 +20,7 @@ const WHATSAPP_FORMAT_CAPABILITIES = FormatCapabilityProfile.define({
     underline: "strip",
     spoiler: "fallback",
     codeLanguage: "fallback",
-    linkLabel: "fallback",
+    linkLabel: "native",
     heading: "fallback",
     taskList: "fallback",
     table: "fallback",
@@ -346,6 +346,23 @@ export function markdownToWhatsAppChunks(
             restored = restored.replaceAll(placeholder, source);
           }
           return restored;
+        },
+        // WhatsApp has no link markup. The address follows the label inside the label's own
+        // formatting, so a link in bold text does not split the bold run.
+        buildLink: (link, value, context) => {
+          const href = link.href.trim();
+          const label = value.slice(link.start, link.end).trim();
+          const comparableHref = href.startsWith("mailto:") ? href.slice("mailto:".length) : href;
+          if (
+            context.origin === "linkify" ||
+            !href ||
+            !label ||
+            label === href ||
+            label === comparableHref
+          ) {
+            return null;
+          }
+          return { start: link.end, end: link.end, open: "", close: ` (${href})` };
         },
       },
       WHATSAPP_FORMAT_CAPABILITIES,
