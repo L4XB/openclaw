@@ -87,6 +87,7 @@ import {
   resolveBedrockPromptCachePolicy,
   type BedrockOptions,
 } from "./bedrock-options.js";
+import { userTurnContent } from "./converse-turns.js";
 import {
   isClaude5BedrockModel,
   resolveBedrockClaudeThinkingProfile,
@@ -858,13 +859,11 @@ function convertMessages(
         }
         const volatileRuntimeContext =
           hasRuntimeContextMarker(m) && !bindsClaudeThinkingPrefix(model);
+        const turnContent = userTurnContent(result);
         if (volatileRuntimeContext && firstVolatileMessageIndex === undefined) {
-          firstVolatileMessageIndex = result.length;
+          firstVolatileMessageIndex = result.length - 1;
         }
-        result.push({
-          role: ConversationRole.USER,
-          content,
-        });
+        turnContent.push(...content);
         break;
       }
       case "assistant": {

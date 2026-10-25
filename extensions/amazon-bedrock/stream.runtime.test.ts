@@ -206,6 +206,28 @@ it("normalizes invalid stored arguments at the Bedrock request boundary", async 
   expect(JSON.stringify(context)).toBe(originalContext);
 });
 
+it("joins a user turn that follows tool results into the tool-result message", async () => {
+  const context = {
+    messages: [
+      { role: "user", content: "check the logs", timestamp: 0 },
+      {
+        ...replayAssistant("amazon.nova-micro-v1:0", [
+          { type: "toolCall", id: "call_logs", name: "read", arguments: { path: "app.log" } },
+        ]),
+        timestamp: 1,
+      },
+      { ...toolResult("call_logs", [{ type: "text", text: "no errors" }], "read"), timestamp: 2 },
+      { role: "user", content: "also check the database", timestamp: 3 },
+    ],
+  } as never;
+  const input = await captureCommandInput(bedrockModel({}), context, {});
+  expect(input.messages?.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+  expect(input.messages?.[2]?.content?.filter((block) => !block.cachePoint)).toEqual([
+    { toolResult: expect.objectContaining({ toolUseId: "call_logs" }) },
+    { text: "also check the database" },
+  ]);
+});
+
 describe("Bedrock profile endpoint resolution", () => {
   it("resolves a GovCloud inference-profile ARN ahead of the ambient region", async () => {
     vi.stubEnv("AWS_PROFILE", "");
