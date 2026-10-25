@@ -40,6 +40,25 @@ describe("WhatsApp text runtime", () => {
     expect(markdownToWhatsApp(input)).toBe(expected);
   });
 
+  it.each([
+    [
+      "**Read [the docs](https://example.com/docs) first.**",
+      "*Read the docs (https://example.com/docs) first.*",
+    ],
+    [
+      "*Check [this guide](https://example.com/g) before you start*",
+      "_Check this guide (https://example.com/g) before you start_",
+    ],
+    ["~~Old [link](https://example.com/old) here~~", "~Old link (https://example.com/old) here~"],
+    ["See [the docs](https://example.com/docs).", "See the docs (https://example.com/docs)."],
+    [
+      "[https://example.com](https://example.com) and [a@b.co](mailto:a@b.co)",
+      "https://example.com and a@b.co",
+    ],
+  ] as const)("keeps the address of a link inside its formatting: %j", (input, expected) => {
+    expect(markdownToWhatsApp(input)).toBe(expected);
+  });
+
   const table = "| Name | Value |\n| --- | --- |\n| A | 1 |";
   const codeTable = "```\n| Name | Value |\n| ---- | ----- |\n| A    | 1     |\n```";
   it.each([
