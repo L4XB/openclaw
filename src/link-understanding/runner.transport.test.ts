@@ -144,6 +144,31 @@ it("skips a timed-out streaming link and processes the next link", async (t) => 
   expect(ctx.LinkUnderstanding).toEqual(["complete page"]);
 });
 
+it("decodes a page in the charset its header or meta tag declares", async (t) => {
+  // "Привет" in KOI8-R and "羅生門" in Shift_JIS.
+  const koi8 = Buffer.from([0xf0, 0xd2, 0xc9, 0xd7, 0xc5, 0xd4]);
+  const shiftJis = Buffer.concat([
+    Buffer.from('<meta charset="Shift_JIS"><title>'),
+    Buffer.from([0x97, 0x85, 0x90, 0xb6, 0x96, 0xe5]),
+    Buffer.from("</title>"),
+  ]);
+  const base = await serve((req, res) => {
+    if (req.url === "/koi8") {
+      res.writeHead(200, { "content-type": "text/plain; charset=koi8-r" });
+      res.end(koi8);
+    } else {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(shiftJis);
+    }
+  }, t.onTestFinished);
+  const { ctx, result } = startLink(`${base}/koi8 ${base}/sjis`);
+  await result;
+  expect(ctx.LinkUnderstanding).toEqual([
+    "Привет",
+    '<meta charset="Shift_JIS"><title>羅生門</title>',
+  ]);
+});
+
 it("fetches bare URLs in order while ignoring titled markdown links", async (t) => {
   const requests: string[] = [];
   const base = await serve((req, res) => {
