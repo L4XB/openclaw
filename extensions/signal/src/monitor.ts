@@ -16,7 +16,7 @@ import {
   resolveSendableOutboundReplyParts,
 } from "openclaw/plugin-sdk/reply-payload";
 import {
-  chunkTextWithMode,
+  chunkMarkdownTextWithMode,
   resolveChunkMode,
   resolveTextChunkLimit,
 } from "openclaw/plugin-sdk/reply-runtime";
@@ -261,7 +261,7 @@ export async function deliverReplies(
     const delivered = await deliverTextOrMediaReply({
       payload: deliveredPayload,
       text: reply.text,
-      chunkText: (value) => chunkTextWithMode(value, textLimit, chunkMode),
+      chunkText: (value) => chunkMarkdownTextWithMode(value, textLimit, chunkMode),
       sendText: send,
       sendMedia: ({ mediaUrl, caption }) => send(caption ?? "", mediaUrl),
     });
