@@ -147,6 +147,7 @@ export type ChannelOutboundAdapter = {
     payload: ReplyPayload;
     cfg?: OpenClawConfig;
     accountId?: string;
+    formatting?: OutboundDeliveryFormattingOptions;
   }) => string;
   pollMaxOptions?: number;
   supportsPollDurationSeconds?: boolean;

@@ -70,6 +70,29 @@ describe("outbound preparation metadata", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("passes the delivery formatting to the channel's sanitizer", async () => {
+    const sanitizeText = vi.fn(({ text }: { text: string }) => text);
+    const plugin = createOutboundTestPlugin({
+      id: "formatting-test",
+      outbound: { deliveryMode: "direct", sendText: vi.fn(), sendMedia: vi.fn(), sanitizeText },
+    });
+    const registry = createTestRegistry([{ pluginId: plugin.id, plugin, source: "test" }]);
+    const formatting = { parseMode: "HTML" } as const;
+    await withPluginRuntimeRegistryScope(registry, () =>
+      prepareOutboundPayloadBatch(
+        {
+          cfg: {},
+          channel: plugin.id,
+          to: "test-recipient",
+          formatting,
+          payloads: [{ text: "<b>x</b>" }],
+        },
+        { hookRunner: createHookRunner(registry) },
+      ),
+    );
+    expect(sanitizeText).toHaveBeenCalledWith(expect.objectContaining({ formatting }));
+  });
+
   it("suppresses whitespace-only payloads without mutating the source", () => {
     const input = setReplyPayloadMetadata({ text: " \n " }, metadata);
     expect(normalizeEmptyPayloadForDelivery(input)).toBeNull();

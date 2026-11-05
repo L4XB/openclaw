@@ -49,4 +49,13 @@ describe("telegramPlugin outbound", () => {
       }),
     ).toBe(literal);
   });
+
+  it("keeps a caller's markup for a parse_mode HTML delivery on a default account", () => {
+    const html =
+      '<b>Disk</b> <a href="https://example.com/docs">docs</a> <tg-spoiler>x</tg-spoiler>';
+    const sanitize = (formatting?: { parseMode: "HTML" }) =>
+      telegramOutbound.sanitizeText?.({ text: html, payload: { text: html }, cfg: {}, formatting });
+    expect(sanitize({ parseMode: "HTML" })).toBe(html);
+    expect(sanitize()).toBe("**Disk** docs x");
+  });
 });

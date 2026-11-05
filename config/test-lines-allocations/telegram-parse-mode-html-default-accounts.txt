@@ -1,0 +1,2 @@
+# A caller's parse_mode HTML send keeps its markup on a default Telegram account instead of becoming Markdown.
+32
